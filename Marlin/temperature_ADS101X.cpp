@@ -63,15 +63,15 @@
 #define ADS101X_CONFIG_LSB_COMP_QUE_FOUR ADS101X_CONFIG_LSB_COMP_QUE(2)
 #define ADS101X_CONFIG_LSB_COMP_QUE_NONE ADS101X_CONFIG_LSB_COMP_QUE(3)
 
-// The total number of consecutive read errors we allow before throwing a major error into the system.
-#define MAXIMUM_ALLOWED_READ_ERRORS 10
+#define MAXIMUM_ALLOWED_READ_ERRORS 10      // The total number of consecutive read errors we allow before throwing a major system error.
+#define NR_SAMPLES_PER_SECOND       20      // Number of samples per second.
+#define SAMPLE_INTERVAL_MS          (1000 / NR_SAMPLES_PER_SECOND) // The number of miliseconds between each sample
 
 TemperatureADS101X::TemperatureADS101X(uint8_t address)
 {
     this->address = address;
     error_counter = 0;
     state = STATE_INIT;
-    delay = 0;
     sample_channel_nr = 0;
     results[0] = results[1] = results[2] = 0;
 }
@@ -151,15 +151,7 @@ bool TemperatureADS101X::isReady()
         else
         {
             // Too many I2C errors. Stop the machine.
-            switch(address)
-            {
-                case ADS101X_ADC_ADDRESS_HOTEND:
-                    stop(STOP_REASON_I2C_HEAD_COMM_ERROR);
-                    break;
-                case ADS101X_ADC_ADDRESS_BED:
-                    stop(STOP_REASON_I2C_BED_COMM_ERROR);
-                    break;
-            }
+            stop(STOP_REASON_I2C_BED_COMM_ERROR);
         }
         return false;
     }
@@ -205,13 +197,11 @@ void TemperatureADS101X::updateState()
         case STATE_SAMPLE_NEXT:
             setupAIN(sample_channel_nr);
             last_update_time = millis();
-            delay = 2;
             state = STATE_WAIT;
             break;
         case STATE_WAIT:
-            if (millis() - last_update_time > delay)
+            if (millis() - last_update_time > SAMPLE_INTERVAL_MS)
             {
-                delay = 0;
                 state = STATE_READ_RESULT;
             }
             break;

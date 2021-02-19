@@ -17,83 +17,85 @@
 #include "Board.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "Arduino.h"
 #include "pins.h"
 #include "watchdog.h"
 #include "Marlin.h"
+#include "temperature.h"
+#include "stepper.h"
 
 #define __USE_DEBUG_LEDS__
 #include "DebugLeds.h"
 
-// Calculations @ https://docs.google.com/spreadsheets/d/1qF5tl1OkxcSzZYmVoZcvR5AQCxsvpXnV5bHmrN79-qc
-// Connected to 24V - 100k -|- 4k7  - GND = ADC ~221 on Ultimaker 2.0 board
-#define MAIN_BOARD_ADC_V2_0 221
-// Connected to 24V - 100k -|- 10k  - GND = ADC ~447 ADC on Ultimaker 2.x board
-#define MAIN_BOARD_ADC_V2_x 447
-// Connected to 24V - 100k -|- 14k7 - GND = ADC ~630 ADC on Ultimaker board revision I
-#define MAIN_BOARD_ADC_REV_I 630
 // Connected to 24V - 10k -|- 2k2 - GND = ADC ~869 on 2621 board (Ultimaker 3.1 board)
-#define MAIN_BOARD_ADC_2621B 869
+#define MAIN_BOARD_24V  869
 
-// Connected to 24V (after high-power switch) - 10k -|- 2k2 - GND = 4.328V (@ Vref=5.1V) = ADC ~869 on 2621 board (Ultimaker 3.1 board)
-#define SWITCH_ON_LIMIT_VOLTAGE 200
-
-// The following define selects which power supply you have.
-// We need to set our line HIGH to keep our main relay on.
-#define PS_ON_AWAKE  HIGH
-#define PS_ON_ASLEEP LOW
+#define MAIN_BOARD_24V_VOLTAGE_DIVIDER_FACTOR (2.2 / (2.2 + 10.0))
+#define MAIN_BOARD_24V_CONVERT_TO_RAW_ADC(v) (int)(v * MAIN_BOARD_24V_VOLTAGE_DIVIDER_FACTOR / 5.0 * 1024.0)
 
 Board::BoardType Board::board_id = BOARD_NOT_YET_DETECTED;
 
-// Determine the printed circuit board revision type by reading the analog voltage on a defined pin.
-// This needs to be done to identify the board.
-// Note that we can only call analogRead() before temperatureInit() as temperatureInit takes over control of the ADC peripheral.
+// Determine the printed circuit board revision type by reading the hardware coded id-pins.
 void Board::detect()
 {
-    // Only detect once, because detection will power down the board which makes sure nothing will be interfering with ADC reading
-    if (board_id != BOARD_NOT_YET_DETECTED)
-    {
-        return;
-    }
+    // Configure the ID pins for reading.
+    SET_INPUT(BOARD_REV_1_PIN);
+    SET_INPUT(BOARD_REV_2_PIN);
+    SET_INPUT(BOARD_REV_3_PIN);
+    // Enable the internal pull up resistors.
+    WRITE(BOARD_REV_1_PIN, HIGH);
+    WRITE(BOARD_REV_2_PIN, HIGH);
+    WRITE(BOARD_REV_3_PIN, HIGH);
 
-    Board::powerDown();
-
-    int16_t main_board_voltage = analogRead(ADC_INPUT_VOLTAGE_PIN);
-    if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_V2_0))
-    {
-        board_id = BOARD_V2_0;
-    }
-    else if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_V2_x))
-    {
-        board_id = BOARD_V2_X;
-    }
-    else if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_REV_I))
-    {
-        board_id = BOARD_REV_I;
-    }
-    else if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_2621B))
-    {
-        board_id = BOARD_2621B;
-    }
-    else
-    {
-        board_id = BOARD_UNKNOWN;
-    }
+    board_id = static_cast<BoardType>(READ(BOARD_REV_1_PIN) + (READ(BOARD_REV_2_PIN) << 1) + (READ(BOARD_REV_3_PIN) << 2));
 
     MSerial.print("LOG:Detected board with id #");
     MSerial.println(board_id);
 }
 
-// Note that we can only call analogRead() before temperatureInit() as temperatureInit takes over control of the ADC peripheral.
 uint8_t Board::init()
 {
-    if (getId() == Board::BOARD_2621B)
+    INITIALIZE_DEBUG_LEDS;
+
+    // Set the algorithm defaults before any error is detected, otherwise these
+    // functions will never be called after an error is triggered.
+    setPowerDefaults();
+    setPidDefaults();
+
+    uint8_t result = executePreInit();
+    if (result != 0)
     {
-        return initBoard2621B();
+        return result;
     }
 
-    return 0;
+    if (board_id == BOARD_E2)
+    {
+        result = initBoardE2();
+    }
+    else
+    {
+        MSerial.print("LOG:Unsupported board type detected. Aborting.");
+        return STOP_REASON_UNSUPPORTED_BOARD_ID;
+    }
+
+    if (result != 0)
+    {
+        return result;
+    }
+
+    executePostInit();
+
+    return result;
+}
+
+void Board::powerDownSafely()
+{
+    // A sudden drop in the power supply can damage the stepper drivers.
+    // By disabling the steppers before switching off the 24V power supply we prevent this.
+    disable_all_steppers();
+    powerDown();
 }
 
 void Board::powerDown()
@@ -103,51 +105,30 @@ void Board::powerDown()
     WRITE(PS_ON_PIN, PS_ON_ASLEEP);
     #endif
 
-    if (getId() == Board::BOARD_REV_I)
-    {
-        // Board revision I and higher have removed the safety circuit. But only rev I needs to implement this pin hack!
-        // This means SAFETY_TRIGGERED_PIN has to be turned as output and switched to HIGH.
-        // As this switches on the high end of the relay circuit, while the PS_ON_PIN switches on the low side.
-        SET_OUTPUT(SAFETY_TRIGGERED_PIN);
-        WRITE(SAFETY_TRIGGERED_PIN, HIGH);
-    }
+    enable_external_5v(false);
 }
 
 void Board::powerUp()
 {
-    // Right now we cannot power up the BOARD_2621B because this would need the sequence like the one performed during init.
-    // This sequence is now not possible since the ADC cannot be accessed at this time anymore.
-    // TODO: EM-2760 [New] - fix this. We want to enable power on connection to Opinicus and not earlier
-    if (getId() != Board::BOARD_2621B)
-    {
-        #if defined(PS_ON_PIN) && PS_ON_PIN > -1
-        SET_OUTPUT(PS_ON_PIN); // GND
-        WRITE(PS_ON_PIN, PS_ON_AWAKE);
-        #endif
-    }
+    #if defined(PS_ON_PIN) && PS_ON_PIN > -1
+    SET_OUTPUT(PS_ON_PIN); // GND
+    WRITE(PS_ON_PIN, PS_ON_AWAKE);
+    #endif
 
-    if (getId() == Board::BOARD_REV_I)
-    {
-        // Board revision I and higher have removed the safety circuit. But only rev I needs to implement this pin hack!
-        // This means SAFETY_TRIGGERED_PIN has to be turned as output and switched to LOW.
-        // As this switches on the high end of the relay circuit, while the PS_ON_PIN switches on the low side.
-        SET_OUTPUT(SAFETY_TRIGGERED_PIN);
-        WRITE(SAFETY_TRIGGERED_PIN, LOW);
-    }
+    enable_external_5v(true);
+    _delay_ms(100);     // Safety delay on request of Electronics department for not damaging the 24V_HP FET.
 }
 
-
-// Init sequences
 
 uint8_t Board::executePreInit()
 {
     SERIAL_ECHOLNPGM("INIT: pre init");
-    uint8_t board_id = getId();
-
-    if (board_id == Board::BOARD_2621B)
+    if (board_id == BOARD_E2)
     {
-        INITIALIZE_DEBUG_LEDS;
         SWITCH_ON_DEBUG_LED(DEBUG_LED0);
+
+        // Enable the topcap inputs
+        SET_INPUT(TOPCAP_PRESENT_PIN);
 
         // Ensure the High Power supply is switched off.
         WRITE(PS_ON_PIN, PS_ON_ASLEEP);     // First setting the value before making the port an output prevents unwanted glitch.
@@ -156,87 +137,102 @@ uint8_t Board::executePreInit()
         SET_INPUT(POWER_FAIL_N_PIN);        // set POWER_FAIL pin as input
         WRITE(POWER_FAIL_N_PIN, HIGH);      // initialize as pull up
 
-        // Wait for Power Fail input to become high, i.e. no power error.
+        // Verify the Power Fail detection circuit.
+        // Wait for Power Fail input to become high, i.e. power == ok.
         unsigned long start_time = millis();
+        fprintf_P(stderr, PSTR("Waiting for nPWR_FAIL to negate"));
         while ( !READ(POWER_FAIL_N_PIN) )
         {
             // If after half a second, this pin is not high, something is wrong, discontinue.
             if ((millis() - start_time > 0.5 * 1000UL))
             {
+                fprintf_P(stderr, PSTR("\nnPWR_FAIL did not negate in time\n"));
                 return STOP_REASON_PCB_INIT_POWERFAIL_N;
             }
+
+            _delay_ms(50);
             watchdog_reset();
+            fprintf_P(stderr, PSTR("."));
         }
-
-        SWITCH_ON_DEBUG_LED(DEBUG_LED1);
+        fprintf_P(stderr, PSTR("\nnPWR_FAIL ok\n"));
     }
 
     return 0;
 }
 
-uint8_t Board::executePostInit()
+void Board::executePostInit()
 {
-    SERIAL_ECHOLNPGM("INIT: post init");
-    uint8_t board_id = getId();
-
-    if (board_id == Board::BOARD_2621B)
-    {
-        SWITCH_OFF_DEBUG_LED(DEBUG_LED0);
-        SWITCH_OFF_DEBUG_LED(DEBUG_LED1);
-        SWITCH_OFF_DEBUG_LED(DEBUG_LED2);
-    }
-    return 0;
+    SWITCH_OFF_DEBUG_LED(DEBUG_LED0);
+    SWITCH_OFF_DEBUG_LED(DEBUG_LED1);
+    SWITCH_OFF_DEBUG_LED(DEBUG_LED2);
 }
 
-uint8_t Board::initBoard2621B()
+bool Board::test24HP()
 {
-    SERIAL_ECHOLNPGM("INIT: BOARD_2621B");
-    uint8_t result = executePreInit();
-    if (result != 0)
+    // Ensure 24V HP is on
+    WRITE(PS_ON_PIN, PS_ON_AWAKE);
+    _delay_ms(1000);    // Very slow. Don't shorten this too much! Can take 100ms to rise and switching off during rise can break the FET.
+
+    // Check the 24V HP voltage is correct.
+    int16_t high_power_voltage = analogRead(ADC_HIGH_POWER_VOLTAGE_PIN);
+    fprintf_P(stderr, PSTR("Self check high power voltage on: %d "), high_power_voltage);
+
+    if (!isWithinTolerance(high_power_voltage, MAIN_BOARD_24V))
     {
-        return result;
+        fprintf_P(stderr, PSTR("FAIL\n"));
+        return false;
+    } else {
+        fprintf_P(stderr, PSTR("OK\n"));
     }
 
-    // The output voltage should be below 6V before the main switch is
-    // turned on to make sure that the inrush current limiter operates
-    // as designed. The voltage may be higher if the switch was on just
-    // before we got here.
-    unsigned long start_time = millis();
-    int16_t high_power_voltage = analogRead(ADC_OUTPUT_VOLTAGE_PIN);
-    do
+    // Now switch off the 24V_HP and verify that the voltage drops.
+    WRITE(PS_ON_PIN, PS_ON_ASLEEP);
+    for (uint8_t n = 0; n < 50; n++)
     {
-        high_power_voltage += analogRead(ADC_OUTPUT_VOLTAGE_PIN);
-        high_power_voltage /= 2;
+        _delay_ms(100);
         watchdog_reset();
 
-        if (millis() - start_time >= 6 * 1000UL)    // Discharging should take less than 6 seconds.
+        high_power_voltage = analogRead(ADC_HIGH_POWER_VOLTAGE_PIN);
+        if (high_power_voltage < MAIN_BOARD_24V_CONVERT_TO_RAW_ADC(20.0))
         {
-            // error! voltage not low enough, risk of shoot-through
-            MSerial.print("LOG:Error initial output voltage too high: ");
-            MSerial.println(high_power_voltage);
-            return STOP_REASON_PCB_INIT_PRE_CHARGE;
+            break;
         }
-    } while (high_power_voltage > SWITCH_ON_LIMIT_VOLTAGE);
+    }
+    fprintf_P(stderr, PSTR("Self check high power voltage off: %d "), high_power_voltage);
+    if (high_power_voltage > MAIN_BOARD_24V_CONVERT_TO_RAW_ADC(20.0))
+    {
+        fprintf_P(stderr, PSTR("FAIL\n"));
+        // Error is ignored on purpose since a short-circuited FET still results in a good working printer.
+        SERIAL_ECHO_START
+        SERIAL_ECHOLNPGM("High Power voltage FET fails to switch off");
+    }
+    else
+    {
+        fprintf_P(stderr, PSTR("OK\n"));
+    }
 
+    // Switch on the 24V_HP again.
+    WRITE(PS_ON_PIN, PS_ON_AWAKE);
+    _delay_ms(100);     // Safety delay on request of Electronics department for not damaging the 24V_HP FET.
+    return true;
+}
+
+uint8_t Board::initBoardE2()
+{
+    fprintf_P(stderr, PSTR("\nPowering up VCC24_HP\n"));
     // turn on the main power supply switch
     SWITCH_ON_DEBUG_LED(DEBUG_LED1);
     WRITE(PS_ON_PIN, PS_ON_AWAKE);
 
-    // Wait for the output voltage to rise.
-    _delay_ms(50);
-
-    // Measure output voltage.
-    high_power_voltage = analogRead(ADC_OUTPUT_VOLTAGE_PIN);
-    if (!isWithinTolerance(high_power_voltage, MAIN_BOARD_ADC_2621B))
+    if(!Board::test24HP())
     {
-        // It's not - meaning the high power safety switched turned off
-        SWITCH_OFF_DEBUG_LED(DEBUG_LED1);
-        MSerial.print("# ERROR: final voltage too low: ");
-        MSerial.println(high_power_voltage);
-        return STOP_REASON_PCB_INIT_HP_SW_SHUTDOWN;
+        fprintf_P(stderr, PSTR("VCC24_HP failed\n"));
+        return STOP_REASON_HP_SW_VOLTAGE_LOW;
     }
+    fprintf_P(stderr, PSTR("VCC24_HP ok\n"));
 
-    return executePostInit();
+    enable_external_5v(true);
+    return 0;
 }
 
 bool Board::isWithinTolerance(const int16_t analog_value, const int16_t adc_constant, const int16_t tolerance)
@@ -244,7 +240,67 @@ bool Board::isWithinTolerance(const int16_t analog_value, const int16_t adc_cons
     return abs(analog_value - adc_constant) < tolerance;
 }
 
+void Board::enable_external_5v(bool enable)
+{
+    if (board_id == BOARD_E2)
+    {
+        #if defined(V5_EXT_ENABLE_PIN) && V5_EXT_ENABLE_PIN > -1
+        SET_OUTPUT(V5_EXT_ENABLE_PIN);
+        WRITE(V5_EXT_ENABLE_PIN, enable);
+        #endif
+    }
+}
+
 bool Board::hasCaseFans()
 {
-    return board_id == Board::BOARD_2621B;
+    return board_id == BOARD_2621B || board_id == BOARD_V4;
+}
+
+void Board::setPidDefaults()
+{
+    if (board_id == BOARD_E2)
+    {
+        // M301 - Set nozzle PID parameters FF, P, I and D
+        for (uint8_t extruder = 0; extruder < EXTRUDERS; extruder++)
+        {
+            hotend_pid[extruder].setKff(0.4);
+            hotend_pid[extruder].setKp(10.00);
+            hotend_pid[extruder].setKi(0.5);
+            hotend_pid[extruder].setKd(40);
+            hotend_pid[extruder].setKiMax(15);
+            hotend_pid[extruder].setFunctionalRange(45);
+            hotend_pid[extruder].setKpcf(0.06);
+        }
+
+        // M304 - Set bed PID parameters FF, P, I and D
+        heated_bed_pid.setKff(2.5);
+        heated_bed_pid.setKp(250);
+        heated_bed_pid.setKi(2);
+        heated_bed_pid.setKd(0);
+        heated_bed_pid.setKiMax(500);
+        heated_bed_pid.setFunctionalRange(2);
+    }
+}
+
+void Board::setPowerDefaults()
+{
+    if (board_id == BOARD_E2)
+    {
+        // M290 P<total_power_budget> I<idle_power_consumption>
+        pwr.setTotalPowerBudget(221);
+        pwr.setIdlePowerConsumption(10);    // Note that engaged motors can eat a lot of power, so ensure those are disabled!
+
+        // M291 R<nominal_bed_resistance> A<bed_resistance_per_degree> V<bed_voltage>
+        pwr.setNominalBedResistance(3.678255);
+        pwr.setBedResistancePerDegree(0.012285);
+        pwr.setBedVoltage(24);
+
+        // M292 T<hotend_nr> R<nominal_hotend_cartridge_resistance> V<hotend_slot_voltage> P<max_hotend_power>
+        for (uint8_t extruder = 0; extruder < EXTRUDERS; extruder++)
+        {
+            pwr.setNominalHotendResistance(extruder, 16);
+            pwr.setHotendVoltage(extruder, 24);
+            pwr.setMaxPowerUsageForHeater(extruder, 40);
+        }
+    }
 }

@@ -20,8 +20,7 @@
 #include <stdint.h>
 #include "i2c_driver.h"
 
-#define ADS101X_ADC_ADDRESS_HOTEND 0b1001000
-#define ADS101X_ADC_ADDRESS_BED 0b1001001
+#define ADS101X_ADC_ADDRESS 0b1001001
 
 class TemperatureADS101X
 {
@@ -96,8 +95,6 @@ private:
         STATE_SAMPLE_NEXT,
         STATE_WAIT,
     } state;
-    /** @brief Delay counter, if contains a value higher than 1, it will delay the state machine update by this many miliseconds. */
-    uint8_t delay;
     /** @brief Current actively sampling channel number, goes from 0 to 2, managed by the internal state machine */
     uint8_t sample_channel_nr;
     /** @brief Keep track of the last milli second time that we did an update. This to prevent updating in a tight loop */

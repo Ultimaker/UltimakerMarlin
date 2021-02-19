@@ -11,7 +11,9 @@ typedef char prog_char;
 #define strcpy_P strcpy
 #define strlen_P strlen
 #define strcmp_P strcmp
+#define printf_P printf
 #define sprintf_P sprintf
+#define fprintf_P fprintf
 #define strcat_P strcat
 #define strstr_P strstr
 #define strncmp_P strncmp

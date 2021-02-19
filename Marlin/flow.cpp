@@ -37,7 +37,7 @@ Flow::Flow()
 
 void Flow::init()
 {
-    bool error_raised = false; 
+    bool error_raised = false;
     for (uint8_t sensor=0; sensor < NR_OF_FLOW_SENSORS; sensor++)
     {
         SERIAL_ECHO_START;
@@ -49,7 +49,7 @@ void Flow::init()
             SERIAL_ECHOPGM("WARNING:FILAMENT_FLOW_SENSOR_INIT:");
             MSerial.print(sensor, DEC);
             SERIAL_ECHOLNPGM(":Unable to initialize sensor");
-            error_raised = true; 
+            error_raised = true;
         }
     }
     if (!error_raised)

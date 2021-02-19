@@ -88,7 +88,7 @@ void mc_arc(float *position, float *target, float *offset, uint8_t axis_0, uint8
   float cos_T = 1-0.5*theta_per_segment*theta_per_segment; // Small angle approximation
   float sin_T = theta_per_segment;
 
-  float arc_target[NUM_AXIS];
+  float arc_target[4];
   float sin_Ti;
   float cos_Ti;
   float r_axisi;
@@ -125,7 +125,6 @@ void mc_arc(float *position, float *target, float *offset, uint8_t axis_0, uint8
     arc_target[axis_linear] += linear_per_segment;
     arc_target[E_AXIS] += extruder_per_segment;
 
-    clamp_to_software_endstops(arc_target);
     plan_buffer_line(arc_target[X_AXIS], arc_target[Y_AXIS], arc_target[Z_AXIS], arc_target[E_AXIS], feed_rate, extruder);
   }
   // Ensure last segment arrives at target location.

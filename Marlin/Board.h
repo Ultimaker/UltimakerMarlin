@@ -20,6 +20,12 @@
 
 #include <stdint.h>
 
+// The following define selects which power supply you have.
+// We need to set our line HIGH to keep our main relay on.
+#define PS_ON_AWAKE  HIGH
+#define PS_ON_ASLEEP LOW
+
+
 /** @brief Class to determine the type of hardware being used (board identification)
  *  based on the voltage divider.
  */
@@ -29,12 +35,12 @@ public:
     /** @brief Enum for different board variations. There are a few slightly different variants on the boards, the board type can be used to react differently for these boards. */
     typedef enum
     {
-        BOARD_NOT_YET_DETECTED=-1,
-        BOARD_UNKNOWN,  // Board type cannot be discovered. Newer board, or something is wrong with the board/power supply.
-        BOARD_V2_0,     // Ultimaker 2 board or one of the initial prototype board for the Ultimaker 3. Not used in the field. Has 8 microsteps on the Z axis.
-        BOARD_V2_X,     // Initial production board for the Ultimaker 3. Has 16 microsteps on the Z.
-        BOARD_REV_I,    // Update of the Ultimaker 3 board. Removes all unused components. This requires slightly different safety circuit handling.
-        BOARD_2621B,    // Ultimaker 3.1/XL board, rev. B (2621 == 1000897; numbering scheme has changed)
+        BOARD_NOT_YET_DETECTED=-2,
+        BOARD_UNKNOWN=-1,   // Board type cannot be discovered. Newer board, or something is wrong with the board/power supply.
+        BOARD_2621B=0,      // S5 board, rev. B (2621 == 1000897; numbering scheme has changed). Introduced TMC2130 stepper drivers and flow sensor.
+        BOARD_V4=1,         // Ultimainboard v4 with SMARC SOM
+        BOARD_E2=4,         // Ultimaker E1. Based on BOARD_V4 but removed SOM, 1 extruder, UM2+ type nozzles (no print cores), no bed leveling and optional flow sensor.
+        BOARD_V2_X=7,       // Ultimainboard v2 for UM3. Has 16 microsteps on the Z. REV_I variant removed all unused components and requires slightly different safety circuit handling.
         MAX_BOARD_ID
     } BoardType;
 
@@ -57,17 +63,34 @@ public:
         return board_id;
     }
 
-    /** @brief Power down the board.
-     */
-    static void powerDown();
+    /** @brief Disable all stepper motors and then switch of the 24V power supply
+    */
+    static void powerDownSafely();
 
-    /** @brief Power up the board
+    /** @brief Enable the 24V Power supply.
      */
     static void powerUp();
 
     // @brief  Returns True when this board supports case fans.
     // @return True when the board has case fans.
     static bool hasCaseFans();
+
+    /// Set the default PID values for this board type.
+    // Note that these defaults can be overruled by the M12005 command.
+    static void setPidDefaults();
+
+    /// Set the default Power Usage values for this board type.
+    static void setPowerDefaults();
+
+    /**
+     * @brief Tests the high power 24V supply.
+     * First this turns on the high power 24V (HP24) power supply and checks if the voltage is 24V (within a margin)
+     *  Then it turns off HP24 and checks that the voltage is below 20V after 5 seconds.
+     * If all tests passed, it leaves the HP24 on
+     * @return Returns true if all the checks passed
+     */
+    static bool test24HP();
+
 private:
     /** @brief Determines if the give analog value is within the specified tolerance of the specified ADC constant
      *  @param analog_value The value to verify
@@ -76,6 +99,8 @@ private:
      *  @return Returns true if the analog value is within the tolerance value of the ADC constant, otherwise false
      */
     static bool isWithinTolerance(const int16_t analog_value, const int16_t adc_constant, const int16_t tolerance=TOLERANCE);
+
+    static void enable_external_5v(bool enable);
 
     /** @brief The detected board id */
     static BoardType board_id;
@@ -89,14 +114,18 @@ private:
     static uint8_t executePreInit();
 
     /** @brief Perform a post-init, for example turning off debug leds, etc.
-     *  @return 0 if everything is ok
      */
-    static uint8_t executePostInit();
+    static void executePostInit();
 
     /** @brief One of the board init functions.
      *  @return 0 if init finished without complications.
      */
-    static uint8_t initBoard2621B();
+    static uint8_t initBoardE2();
+
+    /** @brief Disable the 24V power supply.
+     */
+    static void powerDown();
 };
 
 #endif//BOARD_H
+

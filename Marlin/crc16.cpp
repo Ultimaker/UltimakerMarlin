@@ -86,6 +86,6 @@ void Crc16_test()
     uint16_t expected_crc = 0x92;
     uint8_t test[] = "123456789\0x0";
     Crc16 result(test, 9);
-    printf("The expected check value for %s is 0x%X, actual result = 0x%X\n", (char*)test, expected_crc, result.getCrc());
+    printf_P(PSTR("The expected check value for %s is 0x%X, actual result = 0x%X\n"), (char*)test, expected_crc, result.getCrc());
     assert(expected_crc == result.getCrc());
 }

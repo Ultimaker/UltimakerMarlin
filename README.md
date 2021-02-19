@@ -15,11 +15,7 @@ A fork by bkubicek for the Ultimaker was merged, and further development was aid
 Some features have been added by:
 Lampmaker, Bradley Feldman, and others...
 
-Main difference between UM2:
-* Added bed capacitance distance sensor.
-* Improved dual nozzle support.
-* Added commands to read nozzle eeprom data.
-* Added filament movement sensor.
+Main difference from UM2:
 * Removed SD Card support, this is now handled by the other CPU board.
 * Removed all LCD support.
 
@@ -38,7 +34,6 @@ Features:
 *   Endstop trigger reporting to the host software.
 *   Heater power reporting. Useful for PID monitoring.
 *   PID tuning
-*   CoreXY kinematics (www.corexy.com/theory.html)
 *   Automatic operation of extruder/cold-end cooling fans based on nozzle temperature
 
 The default baudrate is 250000. This baudrate has less jitter and hence errors than the usual 115200 baud, but is less supported by drivers and host-environments.
@@ -62,10 +57,6 @@ Marlin is able to print those arcs. The advantage is the firmware can choose the
 and can perform the arc with nearly constant velocity, resulting in a nice finish.
 Also, less serial communication is needed.
 
-*Temperature Oversampling:*
-
-To reduce noise and make the PID-differential term more useful, 8 ADC conversion results are averaged.
-
 *Endstop trigger reporting:*
 
 If an endstop is hit while moving towards the endstop, the location at which the firmware thinks that the endstop was triggered is outputed on the serial port.
@@ -82,11 +73,6 @@ In the serial communication, a #define based level of abstraction was enforced, 
 some transfer is information (usually beginning with "LOG:"), an error "Error:", or just normal protocol,
 necessary for backwards compatibility.
 
-*Interrupt based temperature measurements:*
-
-An interrupt is used to manage ADC conversions, and enforce checking for critical temperatures.
-This leads to less blocking in the heater management routine.
-
 Serial Protocol Implementation:
 ===============================
 The serial protocol implementation can be found in the griffin repository, docs/Serial_Protocol.odt
@@ -100,11 +86,9 @@ Implemented G Codes:
 *  G3  - CCW ARC
 *  G4  - Dwell S<seconds> or P<milliseconds>
 *  G28 - Home all Axis
-*  G30 - Probe Z at current position and report result.
-*  G31 - Get/update capacitive sensor base level
 *  G90 - Use Absolute Coordinates
 *  G91 - Use Relative Coordinates
-*  G92 - Set current position to cordinates given
+*  G92 - Set current position to given coordinates
 
 RepRap M Codes
 *  M104 - Set extruder target temp
@@ -129,12 +113,6 @@ Custom M Codes
 *  M121 - Enable endstops
 *  M140 - Set bed target temp
 *  M142 - Set system LEDs
-*  M143 - Set head LEDs
-*  M144 - Set allow hotend removal
-*  M145 - Clear allow hotend removal
-*  M149 - Read hotend SERIAL
-*  M150 - Read raw hotend eeprom page as hex data.
-*  M151 - Write Raw hotend data per 8 bytes.
 *  M201 - Set max acceleration in units/s^2 for print moves (M201 X1000 Y1000)
 *  M203 - Set maximum feedrate that your machine can sustain (M203 X200 Y200 Z300 E10000) in mm/sec
 *  M204 - Set default acceleration: S normal moves T filament only moves (M204 S3000 T7000) im mm/sec^2.
@@ -146,10 +124,6 @@ Custom M Codes
 *  M301 - Set nozzle PID parameters FF, P, I and D
 *  M302 - Allow cold extrudes
 *  M304 - Set bed PID parameters FF, P, I and D
-*  M310 - Single cap sensor read
-*  M311 - Calculate cap sensor noise
-*  M312 - Reset capacitance chip
-*  M313 - Re-init capacitance chip
 *  M400 - Finish all moves
 *  M401 - Quickstop - Abort all the planned moves
 *  M405 - Enable/disable the flow sensor hardware. S1=active A=averaging value

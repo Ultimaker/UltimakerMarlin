@@ -19,12 +19,6 @@
 #include "fastio.h"
 #include "Marlin.h"
 
-#define TMC2130_SPI_CS_X  F0
-#define TMC2130_SPI_CS_Y  F1
-#define TMC2130_SPI_CS_Z  F2
-#define TMC2130_SPI_CS_E0 F3
-#define TMC2130_SPI_CS_E1 F4
-
 #define IHOLD_IRUN_INDEX 0x10
 //Hold current configuration
 #define IHOLD(n) (uint32_t(n) << 0ULL)
@@ -53,20 +47,24 @@
 
 static void setChipSelect(uint8_t chip_idx)
 {
-    if (chip_idx == 0) WRITE(TMC2130_SPI_CS_X, 0);
-    if (chip_idx == 1) WRITE(TMC2130_SPI_CS_Y, 0);
-    if (chip_idx == 2) WRITE(TMC2130_SPI_CS_Z, 0);
-    if (chip_idx == 3) WRITE(TMC2130_SPI_CS_E0, 0);
-    if (chip_idx == 4) WRITE(TMC2130_SPI_CS_E1, 0);
+    if (chip_idx == 0) WRITE(X_SPI_CS_PIN, 0);
+    if (chip_idx == 1) WRITE(Y_SPI_CS_PIN, 0);
+    if (chip_idx == 2) WRITE(Z_SPI_CS_PIN, 0);
+    if (chip_idx == 3) WRITE(E0_SPI_CS_PIN, 0);
+    #if defined(E1_SPI_CS_PIN) && (E1_SPI_CS_PIN > -1)
+        if (chip_idx == 4) WRITE(E1_SPI_CS_PIN, 0);
+    #endif
 }
 
 static void clearChipSelect(uint8_t chip_idx)
 {
-    if (chip_idx == 0) WRITE(TMC2130_SPI_CS_X, 1);
-    if (chip_idx == 1) WRITE(TMC2130_SPI_CS_Y, 1);
-    if (chip_idx == 2) WRITE(TMC2130_SPI_CS_Z, 1);
-    if (chip_idx == 3) WRITE(TMC2130_SPI_CS_E0, 1);
-    if (chip_idx == 4) WRITE(TMC2130_SPI_CS_E1, 1);
+    if (chip_idx == 0) WRITE(X_SPI_CS_PIN, 1);
+    if (chip_idx == 1) WRITE(Y_SPI_CS_PIN, 1);
+    if (chip_idx == 2) WRITE(Z_SPI_CS_PIN, 1);
+    if (chip_idx == 3) WRITE(E0_SPI_CS_PIN, 1);
+    #if defined(E1_SPI_CS_PIN) && (E1_SPI_CS_PIN > -1)
+        if (chip_idx == 4) WRITE(E1_SPI_CS_PIN, 1);
+    #endif
 }
 
 void StepperTMC2130::writeRegister(uint8_t stepper_index, uint8_t register_index, uint32_t value)
@@ -104,11 +102,13 @@ uint32_t StepperTMC2130::readRegister(uint8_t stepper_index, uint8_t register_in
 
 void StepperTMC2130::init()
 {
-    SET_OUTPUT(TMC2130_SPI_CS_X);
-    SET_OUTPUT(TMC2130_SPI_CS_Y);
-    SET_OUTPUT(TMC2130_SPI_CS_Z);
-    SET_OUTPUT(TMC2130_SPI_CS_E0);
-    SET_OUTPUT(TMC2130_SPI_CS_E1);
+    SET_OUTPUT(X_SPI_CS_PIN);
+    SET_OUTPUT(Y_SPI_CS_PIN);
+    SET_OUTPUT(Z_SPI_CS_PIN);
+    SET_OUTPUT(E0_SPI_CS_PIN);
+    #if defined(E1_SPI_CS_PIN) && (E1_SPI_CS_PIN > -1)
+        SET_OUTPUT(E1_SPI_CS_PIN);
+    #endif
 
     for (uint8_t n = 0; n < NUM_MOTOR_DRIVERS; n++)
     {

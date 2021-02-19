@@ -17,11 +17,6 @@
 #ifndef DEBUG_LEDS_H
 #define DEBUG_LEDS_H
 
-// Define the Debug Leds
-#define DEBUG_LED0 F5
-#define DEBUG_LED1 F6
-#define DEBUG_LED2 F7
-
 // Define simple macro's to use them (define __USE_DEBUG_LEDS__ before including file)
 #if defined(__USE_DEBUG_LEDS__)
 

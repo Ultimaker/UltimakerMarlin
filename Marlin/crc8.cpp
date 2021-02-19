@@ -51,11 +51,11 @@ Crc8::Crc8(const uint8_t* message, const size_t nr_of_bytes)
     }
 }
 
-void Crc8::update(const uint8_t* message, const size_t nr_of_bytes)
+void Crc8::update(const void* message, const size_t nr_of_bytes)
 {
     for (size_t index = 0; index < nr_of_bytes; index++)
     {
-        uint8_t byte = message[index];
+        uint8_t byte = ((char*)message)[index];
         update(byte);
     }
 }
@@ -70,6 +70,6 @@ void Crc8_test()
     uint8_t expected_crc = 0xf4;
     uint8_t test[] = "123456789\0x0";
     Crc8 result(test, 9);
-    printf("The expected check value for %s is 0x%X, actual result = 0x%X\n", (char*)test, expected_crc, result.getCrc());
+    printf_P(PSTR("The expected check value for %s is 0x%X, actual result = 0x%X\n"), (char*)test, expected_crc, result.getCrc());
     assert(expected_crc == result.getCrc());
 }

@@ -36,7 +36,7 @@ public:
      *  @param message The message over which the CRC needs to be calculated
      *  @param nr_of_bytes The length of the message
      */
-    void update(const uint8_t* message, const size_t nr_of_bytes);
+    void update(const void* message, const size_t nr_of_bytes);
 
     /** Adds a single byte to the CRC calculation
      *  @param value the value to be added

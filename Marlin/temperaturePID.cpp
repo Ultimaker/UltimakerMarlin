@@ -16,27 +16,10 @@
 */
 #include "temperaturePID.h"
 #include "fan_driver.h"
-#include "stepper.h"
+#include <stdio.h>
 
-#define DUMP_PID_VALUES(temperature, ff, pcf, p, i, d, result) \
-    if (debug_dump) { \
-        SERIAL_ECHOPGM("||PID:"); \
-        SERIAL_ECHO(temperature); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHO(ff); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHO(pcf); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHO(p); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHO(i); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHO(d); \
-        SERIAL_ECHO(';'); \
-        SERIAL_ECHOLN(int(result)); \
-    }
 
-TemperaturePID::TemperaturePID()
+TemperaturePID::TemperaturePID() : d_state_lpf(PID_D_LPF_RC_CONSTANT)
 {
     Kff = 0.0;
     Kp = 0.0;
@@ -54,15 +37,21 @@ TemperaturePID::TemperaturePID()
     i_state = 0.0;
     d_state = 0.0;
     previous_sample = 0.0;
+    previous_error = 0.0;
 
     debug_dump = false;
 }
 
-uint8_t TemperaturePID::update(const float current_temperature)
+uint8_t TemperaturePID::update(const float current_temperature, const float time_delta)
 {
     float error = target_temperature - current_temperature;
     float temperature_delta = current_temperature - previous_sample;
     uint8_t result;
+
+    if(debug_dump)
+    {
+        fprintf_P(stderr, PSTR("PID: dt: %.1f\n"), time_delta);
+    }
 
     //Reject single bad samples, don't do PID control when our previous sample is so much out of line with our current sample.
     if (fabs(temperature_delta) > PID_IGNORE_TEMPERATURE_DELTA)
@@ -70,7 +59,11 @@ uint8_t TemperaturePID::update(const float current_temperature)
         previous_sample = current_temperature;
         result = 0;
 
-        DUMP_PID_VALUES(current_temperature, 0,0,0,0,0, result);
+        if (debug_dump)
+        {
+            fprintf_P(stderr, PSTR("PID: ignore sample\n"));
+        }
+
         return result;
     }
 
@@ -79,33 +72,56 @@ uint8_t TemperaturePID::update(const float current_temperature)
         resetState();
         result = max_output;
 
-        DUMP_PID_VALUES(current_temperature, 0,0,0,0,0, result);
+        if (debug_dump)
+        {
+            fprintf_P(stderr, PSTR("PID: max output\n"));
+        }
     }
     else if (error < -functional_range || target_temperature == 0)
     {
         result = min_output;
 
-        DUMP_PID_VALUES(current_temperature, 0,0,0,0,0, result);
+        if (debug_dump)
+        {
+            fprintf_P(stderr, PSTR("PID: min output\n"));
+        }
     }
     else
     {
-        float p_term = Kp * error;
-        i_state += error * Ki;
+        i_state += error * time_delta;
         i_state = constrain(i_state, -Ki_max, Ki_max);
 
-        d_state = (1.0 - K1) * (Kd * temperature_delta) + (K1 * d_state);
+        d_state = (error - previous_error) / time_delta;
+        d_state_lpf.take_input(d_state, time_delta);
+        float d_state_filtered = d_state_lpf.get_output();
+
         float ff_term = Kff * (target_temperature - FEED_FORWARD_MINIMAL_TEMPERATURE);
-        float pcf_term = Kpcf * getCoolingFanSpeed();
+        float pcf_term = Kpcf * getMaterialCoolingFanSpeed();
+        float p_term = Kp * error;
+        float i_term = Ki * i_state;
+        float d_term = Kd * d_state_filtered;
+        float output = ff_term + pcf_term + p_term + i_term + d_term;
+        result = constrain(output, min_output, max_output);
 
-        result = constrain(ff_term + pcf_term + p_term + i_state - d_state, min_output, max_output);
-
-        DUMP_PID_VALUES(current_temperature, ff_term, pcf_term, p_term, i_state, d_state, result);
+        if (debug_dump) {
+            fprintf_P(stderr, PSTR("PID: err: %.1f ff: %.1f pcf: %.1f p: %.1f i: %.1f d: %.1f out: %d\n"),
+                    error,
+                    ff_term,
+                    pcf_term,
+                    p_term,
+                    i_term,
+                    d_term,
+                    result);
+        }
     }
+
     if (current_temperature < min_input || current_temperature > max_input)
     {
         result = min_output;
     }
+
     previous_sample = current_temperature;
+    previous_error = error;
     return result;
 }
 

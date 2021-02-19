@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include "Configuration.h"
+#include "LowPassFilter.h"
 
 /**
     PID controller for temperature.
@@ -46,9 +47,10 @@ public:
      Update the PID controller. Call when a new temperature sample is ready.
      Implementation assumes this is called every PID_dT.
      @param current_temperature current temperature sample in degree celsius.
+     @param time_delta time passed since previous update in seconds
      @return pwm value for the output in the range 0 to 255.
      */
-    uint8_t update(float current_temperature);
+    uint8_t update(float current_temperature, float time_delta);
 
     /**
      Set the target temperature to a new value.
@@ -96,7 +98,8 @@ public:
      */
     FORCE_INLINE void setKi(float Ki)
     {
-        this->Ki = Ki * PID_dT;
+        this->Ki = Ki;
+        this->i_state = 0;
     }
 
     /**
@@ -116,7 +119,8 @@ public:
      */
     FORCE_INLINE void setKd(float Kd)
     {
-        this->Kd = Kd / PID_dT;
+        this->Kd = Kd;
+        this->d_state = 0;
     }
 
     /**
@@ -198,8 +202,14 @@ private:
     float i_state;
     /** State of the derivative, updated every update call, and slightly smoothed, to prevent noise in the derivative. */
     float d_state;
+
+    /** The low pass filter for the derivative term (d_state) **/
+    LowPassFilter d_state_lpf;
+
     /** Previous temperature sample, used to calculate the derivative */
     float previous_sample;
+    /** Previous error from setpoint to target */
+    float previous_error;
 
     /** Dump the PID controller state on each update trough the serial port. Note that this causes high bandwith use. */
     bool debug_dump;

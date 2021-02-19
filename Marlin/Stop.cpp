@@ -14,18 +14,21 @@
     You should have received a copy of the GNU General Public License
     along with Marlin.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include <stdio.h>
 #include "Stop.h"
 #include "Marlin.h"
 #include "temperature.h"
 #include "Board.h"
+#include "stepper.h"
 
 static uint8_t stopped_reason = 0;             // 0 == not stopped, other value == stop reason
 
 
 void stop(uint8_t reasonNr)
 {
+    fprintf_P(stderr, PSTR("\nStop %d\n"), reasonNr);
     disable_all_heaters();
-    Board::powerDown();
+    Board::powerDownSafely();
     if(stopped_reason == 0)
     {
         stopped_reason = reasonNr;
@@ -70,14 +73,8 @@ void stop(uint8_t reasonNr)
         case STOP_REASON_XY_ENDSTOP_STUCK_ERROR:
             SERIAL_ECHOLNPGM("XY_ENDSTOP_ERROR: Endstop still pressed after backing off. Endstop stuck?");
             break;
-        case STOP_REASON_I2C_HEAD_COMM_ERROR:
-            SERIAL_ECHOLNPGM("I2C_HEAD_COMM_ERROR");
-            break;
         case STOP_REASON_I2C_COMM_ERROR:
             SERIAL_ECHOLNPGM("I2C_COMM_ERROR");
-            break;
-        case STOP_REASON_SAFETY_TRIGGER:
-            SERIAL_ECHOLNPGM("SAFETY_ERROR: Safety circuit triggered");
             break;
         case STOP_REASON_SERIAL_INPUT_TIMEOUT:
             SERIAL_ECHOLNPGM("SERIAL_INPUT_TIMEOUT: No commands received over time. Safety shutdown");
@@ -88,18 +85,22 @@ void stop(uint8_t reasonNr)
         case STOP_REASON_PCB_INIT_POWERFAIL_N:
             SERIAL_ECHOLNPGM("PCB INIT: POWERFAIL line did not signal good within .5s.");
             break;
-        case STOP_REASON_PCB_INIT_PRE_CHARGE:
-            SERIAL_ECHOLNPGM("PCB INIT: Voltage level did not drop below 6V within 1s.");
-            break;
-        case STOP_REASON_PCB_INIT_HP_SW_SHUTDOWN:
+        case STOP_REASON_HP_SW_VOLTAGE_LOW:
             SERIAL_ECHOLNPGM("PCB INIT: HP output voltage is too low.");
             break;
         case STOP_REASON_I2C_BED_COMM_ERROR:
             SERIAL_ECHOLNPGM("I2C_BED_COMM_ERROR");
             break;
+        case STOP_REASON_UNSUPPORTED_BOARD_ID:
+            SERIAL_ECHOLNPGM("PCB INIT: Unsupported board type detected.");
+            break;
         case STOP_REASON_GCODE:
             // no message since it was initiated by gcode
             break;
+        case STOP_REASON_24HP_CHECK_FAILED:
+            SERIAL_ECHOLNPGM("24V power check failed");
+            break;
+
         default:
             SERIAL_ECHOLNPGM(MSG_ERR_STOPPED);
             break;

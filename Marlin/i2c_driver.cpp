@@ -175,6 +175,8 @@ void i2cDriverExecuteAndWait(i2cCommand* command)
     {
         if (millis() - start_time > 100)
         {
+            fprintf_P(stderr, PSTR("\nI2C error (0x%.2x %c)\n"), command->slave_address_rw >> 1, (command->slave_address_rw & 0x01)?'R':'W');
+
             SERIAL_ECHOPGM("LOG:I2C_COMM_ERROR:");
             SERIAL_ECHO(int(command->slave_address_rw));
             SERIAL_ECHO(':');

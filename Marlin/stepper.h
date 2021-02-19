@@ -23,30 +23,30 @@
 
 #include "planner.h"
 
+/** Usage of these macros is to optimize the code to as minimal amount of instructions as required. Do not touch unless you know what you are doing */
 #if EXTRUDERS > 2
   #define WRITE_E_STEP(v) { if(current_block->active_extruder == 2) { WRITE(E2_STEP_PIN, v); } else { if(current_block->active_extruder == 1) { WRITE(E1_STEP_PIN, v); } else { WRITE(E0_STEP_PIN, v); }}}
-  #define NORM_E_DIR() { if(current_block->active_extruder == 2) { WRITE(E2_DIR_PIN, !INVERT_E2_DIR); } else { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, !INVERT_E1_DIR); } else { WRITE(E0_DIR_PIN, !INVERT_E0_DIR); }}}
-  #define REV_E_DIR() { if(current_block->active_extruder == 2) { WRITE(E2_DIR_PIN, INVERT_E2_DIR); } else { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, INVERT_E1_DIR); } else { WRITE(E0_DIR_PIN, INVERT_E0_DIR); }}}
+  #define NORM_E_DIR() { if(current_block->active_extruder == 2) { WRITE(E2_DIR_PIN, !invert_direction[E_AXIS+2]); } else { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, !invert_direction[E_AXIS+1]); } else { WRITE(E0_DIR_PIN, !invert_direction[E_AXIS+0]); }}}
+  #define REV_E_DIR() { if(current_block->active_extruder == 2) { WRITE(E2_DIR_PIN, invert_direction[E_AXIS+2]); } else { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, invert_direction[E_AXIS+1]); } else { WRITE(E0_DIR_PIN, invert_direction[E_AXIS+0]); }}}
 #elif EXTRUDERS > 1
   #define WRITE_E_STEP(v) { if(current_block->active_extruder == 1) { WRITE(E1_STEP_PIN, v); } else { WRITE(E0_STEP_PIN, v); }}
-  #define NORM_E_DIR() { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, !INVERT_E1_DIR); } else { WRITE(E0_DIR_PIN, !INVERT_E0_DIR); }}
-  #define REV_E_DIR() { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, INVERT_E1_DIR); } else { WRITE(E0_DIR_PIN, INVERT_E0_DIR); }}
+  #define NORM_E_DIR() { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, !invert_direction[E_AXIS+1]); } else { WRITE(E0_DIR_PIN, !invert_direction[E_AXIS+0]); }}
+  #define REV_E_DIR() { if(current_block->active_extruder == 1) { WRITE(E1_DIR_PIN, invert_direction[E_AXIS+1]); } else { WRITE(E0_DIR_PIN, invert_direction[E_AXIS+0]); }}
 #else
   #define WRITE_E_STEP(v) WRITE(E0_STEP_PIN, v)
-  #define NORM_E_DIR() WRITE(E0_DIR_PIN, !INVERT_E0_DIR)
-  #define REV_E_DIR() WRITE(E0_DIR_PIN, INVERT_E0_DIR)
+  #define NORM_E_DIR() WRITE(E0_DIR_PIN, !invert_direction[E_AXIS+0])
+  #define REV_E_DIR() WRITE(E0_DIR_PIN, invert_direction[E_AXIS+0])
 #endif
 
-#if MOTOR_CURRENT_PWM_XY_PIN > -1
-extern int motor_current_setting[3];
-#endif
+#define MAX_STEP_FREQUENCY 40000 // Max step frequency for Ultimaker (5000 pps / half step)
 
-#ifdef ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED
-extern bool abort_on_endstop_hit;
-#endif
+extern bool invert_direction[NUM_AXIS+EXTRUDERS-1];
 
 // Initialize and start the stepper motor subsystem
 void st_init();
+
+// Enable the handling of the interrupts
+void st_enable_interrupt();
 
 // Block until all buffered steps are executed
 void st_synchronize();
@@ -73,16 +73,10 @@ bool isEndstopHit();
 
 void finishAndDisableSteppers();
 
+void disable_all_steppers(); // Disable all stepper motor axes, do not block until the marlin buffer is empty
+
 extern block_t *current_block;  // A pointer to the block currently being traced
 
 void quickStop();
-
-void digitalPotWrite(int address, int value);
-void microstep_ms(uint8_t driver, int8_t ms1, int8_t ms2);
-void microstep_mode(uint8_t driver, uint8_t stepping);
-void digipot_init();
-void digipot_current(uint8_t driver, int current);
-void microstep_init();
-void microstep_readings();
 
 #endif  // STEPPER_H

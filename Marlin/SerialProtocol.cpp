@@ -48,7 +48,7 @@ static const char __HEX_DIGITS[] = "0123456789ABCDEF";
 
 void SerialProtocol::readCommand(callback_handle_packet_t callback)
 {
-    /* Local static variables to keep track of the reading  of bytes to fill the packet */
+    /* Local static variables to keep track of the reading of bytes to fill the packet */
     static SerialProtocol::network_packet_t packet;
     static SerialProtocol::reader_state_t   state = WAIT_FOR_HEADER_BYTE;
     static uint8_t                          payload_index = 0;
@@ -90,7 +90,12 @@ void SerialProtocol::readCommand(callback_handle_packet_t callback)
             }
             case WAIT_FOR_SEQUENCE_NUMBER:
             {
-                BREAK_ON_HEADER_BYTE(serial_char);
+                if (serial_char == HEADER_BYTE)
+                {
+                    // Ignore all header bytes after the first 2.
+                    // This allows synchronization on any number >= 2 HEADER_BYTES.
+                    break;
+                }
 
                 if (serial_char != receive_packet_number)
                 {

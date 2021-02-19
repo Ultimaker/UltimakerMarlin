@@ -32,37 +32,29 @@ set(SOURCES
 	PowerBudgetManagementHotendSlot.cpp
 	Stop.cpp
 	SerialProtocol.cpp
-	cap_sense_probe.cpp
 	fan_driver.cpp
 	flow.cpp
 	flow_A1335.cpp
-	i2c_capacitance_FDC1004.cpp
 	i2c_driver.cpp
-	i2c_onewire_ds2482.cpp
-	led_rgbw_pca9632.cpp
+	lifetime_stats.cpp
 	motion_control.cpp
-	oneWireDS2431_eeprom.cpp
-	pca9635_driver.cpp
 	planner.cpp
 	stepper.cpp
 	stepper_TMC2130.cpp
-	stepper_A4988.cpp
 	temperature.cpp
 	temperaturePID.cpp
 	temperature_ADS101X.cpp
 	usart_spi_driver.cpp
 	watchdog.cpp
-)
+	uart.cpp
+	cmdline.cpp
+	cmdline_mem.cpp
+	LowPassFilter.cpp
+		)
 set(ARDUINO_SOURCES
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring.c
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_analog.c
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_digital.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_pulse.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_shift.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WInterrupts.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WMath.cpp
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WString.cpp
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/Print.cpp
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/main.cpp
 )
 
@@ -70,7 +62,7 @@ set(ARDUINO_SOURCES
 add_definitions(-DF_CPU=${AVR_F_CPU})
 add_definitions(-DARDUINO=105)
 # Setup the proper compiler flags for our build. We want maximum warnings, except for a few.
-set(CMAKE_CXX_FLAGS_RELEASE "-Os -Wall -Wextra -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -ffunction-sections -fdata-sections")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -Wall -Wextra -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -ffunction-sections -fdata-sections -fno-threadsafe-statics")
 
 include_directories(${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/)
 include_directories(${ARDUINO_INSTALL_DIR}/hardware/arduino/variants/mega/)
@@ -81,7 +73,7 @@ set(HEX_FILE ${FIRMWARE_NAME}.hex)
 add_executable(${ELF_FILE} ${SOURCES} ${ARDUINO_SOURCES})
 set_target_properties(${ELF_FILE} PROPERTIES
 	COMPILE_FLAGS "-mmcu=${AVR_MCU}"
-	LINK_FLAGS "-mmcu=${AVR_MCU} -Wl,--gc-sections"
+	LINK_FLAGS "-mmcu=${AVR_MCU} -Wl,--gc-sections,-u,vfprintf -lprintf_flt -lm"
 )
 add_custom_command(OUTPUT ${HEX_FILE}
 	COMMAND ${AVR_OBJCOPY} -j .text -j .data -O ihex ${ELF_FILE} ${HEX_FILE}
