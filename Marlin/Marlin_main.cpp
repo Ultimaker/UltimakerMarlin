@@ -68,8 +68,8 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 // G28 - Home all Axis
 // G30 - Probe Z at current position and report result.
 // G31 - get/update capacitive sensor base level
-// G90 - Use Absolute Coordinates
-// G91 - Use Relative Coordinates
+// G90 - Use Absolute Coordinates. Affects all axes, including the E-axis. See M82 for E-axis only.
+// G91 - Use Relative Coordinates. Affects all axes, including the E-axis. See M83 for E-axis only.
 // G92 - Set current position to coordinates given
 
 //RepRap M Codes
@@ -90,7 +90,7 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 // M114 - Output current position to serial port
 // M115 - Get Firmware Version and Capabilities
 // M140 - Set bed target temp
-// M142 - Set system lights (M142 r[0-255] g[0-255] b[0-255] w[0-255])
+// M142 - Set system lights (M142 r[0-255] g[0-255] b[0-255] w[0-255]) Note that the parameter letters are all lower case.
 // M143 - Set hotend light (M143 r[0-255] g[0-255] b[0-255] T[0-1])
 // M144 - Set allow hotend removal (M144 T[0-1])
 // M145 - Clear allow hotend removal (M145 T[0-1])
@@ -109,6 +109,7 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 // M290 P<powerBudget> I<idle_power_consumption>
 // M291 R<nominal_bed_resistance> A<bed_resistance_per_degree> V<bed_voltage>
 // M292 T<hotend_nr> R<nominal_hotend_cartridge_resistance> V<hotend_slot_voltage> P<max_hotend_power>
+// M299 T<hotend_nr> R<retracted length>
 // M301 - Set nozzle PID parameters FF, P, I, D, i, C and R (Q: Debug dump enable/disable)
 // M302 - Allow cold extrudes, or set the minimum extrude S<temperature>
 // M304 - Set bed PID parameters FF, P, I, D, i, C and R (Q: Debug dump enable/disable)
@@ -121,7 +122,9 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 // M405 - Enable/disable the flow sensor hardware. S1=active A=averaging value
 // M406 - Re-init flow sensor algorithm
 // M407 - Read raw flow sensor value: S<sensor number>
+// M408 S[sensor] P[flow error factor] - Set allowed_flow_error_factor for specific flow sensor
 // M907 - Set digital trimpot motor current using axis codes. Current in mA. X-axis sets Y-axis as well. (M907 X1300 Z1300 E1250)
+// M931 - Get motion planner buffer statistics
 // M998 - Intentionally stop the system as if by an error.
 // M999 - Restart after being stopped by error
 // M12000 - Set build volume maximum position (M12000 X200 Y200 Z200)
@@ -139,19 +142,25 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 //===========================================================================
 float homing_feedrate[] = HOMING_FEEDRATE;
 bool axis_relative_modes[] = { false, false, false, false };
-int feedmultiply = 100; //100->1 200->2
-int saved_feedmultiply;
-int extrudemultiply = 100;//ARRAY_BY_EXTRUDERS(100, 100, 100); //100->1 200->2
+int16_t feedmultiply = 100; //100->1 200->2
+int16_t saved_feedmultiply;
+int16_t extrudemultiply = 100;  //100->1 200->2
 float current_position[NUM_AXIS] = { 0.0, 0.0, 0.0, 0.0 };
 float add_homing[NUM_AXIS-1] = {0,0,0};
 float min_pos[NUM_AXIS-1] = { X_MIN_POS, Y_MIN_POS, Z_MIN_POS };
 float max_pos[NUM_AXIS-1] = { X_MAX_POS, Y_MAX_POS, Z_MAX_POS };
 // Extruder offset, only in XY plane
 #if EXTRUDERS > 1
-long extruder_offset[NUM_AXIS-1][EXTRUDERS];
+int32_t extruder_offset[NUM_AXIS-1][EXTRUDERS];
 #endif
 uint8_t active_extruder = 0;
 uint8_t target_fan_speed=0;
+
+/* Motion planner buffer statistics */
+uint8_t  planner_min      = 0;
+uint8_t  planner_max      = 0;
+uint8_t  planner_motions  = 0;
+uint8_t  buffer_underruns = 0;
 
 //===========================================================================
 //=============================private variables=============================
@@ -187,7 +196,7 @@ FlowBase dummy_flow;
 FlowBase *flow = &dummy_flow;
 
 #ifdef ENABLE_WATCHDOG_SERIAL_INPUT
-static unsigned long start_time_empty_command_buffer = 0;
+static uint32_t start_time_empty_command_buffer = 0;
 
 static void check_serial_input_timeout();
 #endif
@@ -214,26 +223,26 @@ static void get_coordinates();
 static void get_arc_coordinates();
 static void prepare_move();
 static void prepare_arc_move(char isclockwise);
-static int bin2hex(char* hex, const uint8_t* bin, int count);
-static int hex2bin(uint8_t* bin, const char* hex, const int buf_size);
+static int16_t bin2hex(char* hex, const uint8_t* bin, int16_t count);
+static int16_t hex2bin(uint8_t* bin, const char* hex, const int16_t buf_size);
 static bool setTargetedHotend();
 static void pulseLeds();
-
-//===========================================================================
-//=============================ROUTINES=============================
-//===========================================================================
 
 /** @brief The callback function to be executed when a packet has been read
  *  @param packet The network packet received from the serial line
  *  @return Returns True if the packet could be processed and added to the command buffer
  */
-bool handle_packet(SerialProtocol::network_packet_t packet);
+static bool handle_packet(SerialProtocol::network_packet_t packet);
+
+//===========================================================================
+//=============================ROUTINES=============================
+//===========================================================================
 
 void serial_echopair_P(const char *s_P, float v)
     { serialprintPGM(s_P); SERIAL_ECHO(v); }
 void serial_echopair_P(const char *s_P, double v)
     { serialprintPGM(s_P); SERIAL_ECHO(v); }
-void serial_echopair_P(const char *s_P, unsigned long v)
+void serial_echopair_P(const char *s_P, uint32_t v)
     { serialprintPGM(s_P); SERIAL_ECHO(v); }
 
 static bool is_command_queued()
@@ -251,7 +260,7 @@ static float code_value()
     return strtod(code_value_ptr(), NULL);
 }
 
-static long code_value_long()
+static int32_t code_value_long()
 {
     return strtol(code_value_ptr(), NULL, 10);
 }
@@ -287,7 +296,8 @@ void setup()
     watchdog_init();
     st_init();    // Initialize stepper, this will automatically disable the steppers
     initBoard();
-    if (Board::getId() == Board::BOARD_2621B)
+    printf_P(PSTR("Detected board ID = %d\n"), Board::getId());
+    if (Board::getId() == Board::BOARD_2621B || Board::getId() == Board::BOARD_V4)
     {
         UsartSpiDriver::init();
         StepperTMC2130::init();
@@ -328,11 +338,8 @@ void loop()
   if (is_command_queued())
   {
     process_command();
-    if (is_command_queued())
-    {
-      command_buffer_length--;
-      command_buffer_index_read = (command_buffer_index_read + 1) % BUFSIZE;
-    }
+    command_buffer_length--;
+    command_buffer_index_read = (command_buffer_index_read + 1) % BUFSIZE;
   }
   //check heater every n milliseconds
   manage_heater();
@@ -340,7 +347,7 @@ void loop()
   checkHitEndstops();
 }
 
-bool handle_packet(SerialProtocol::network_packet_t packet)
+static bool handle_packet(SerialProtocol::network_packet_t packet)
 {
     if (command_buffer_length >= BUFSIZE)
     {
@@ -351,24 +358,6 @@ bool handle_packet(SerialProtocol::network_packet_t packet)
     memcpy((void*)command_buffer[command_buffer_index_write], (void*)packet.payload, packet.payload_size);
     command_buffer[command_buffer_index_write][packet.payload_size] = 0; //terminate string
     gcodeline_sequence_number[command_buffer_index_write] = packet.sequence_number;
-
-    if (code_seen('G'))
-    {
-        switch (code_value_long())
-        {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-                if (isStopped())
-                { // If printer is stopped by an error the G[0-3] codes are ignored.
-                    SERIAL_ECHOLNPGM(MSG_ERR_STOPPED);
-                }
-                break;
-            default:
-                break;
-        }
-    }
 
     command_buffer_index_write = (command_buffer_index_write + 1) % BUFSIZE;
     command_buffer_length++;
@@ -386,13 +375,13 @@ DEFINE_PGM_READ_ANY(signed char, byte);
 #define XYZ_CONSTS_FROM_CONFIG(type, array, CONFIG) \
 static const PROGMEM type array##_P[3] =        \
     { X_##CONFIG, Y_##CONFIG, Z_##CONFIG };     \
-static inline type array(int axis)          \
+static inline type array(int16_t axis)          \
     { return pgm_read_any(&array##_P[axis]); }
 
 XYZ_CONSTS_FROM_CONFIG(float, home_retract_mm, HOME_RETRACT_MM);
 XYZ_CONSTS_FROM_CONFIG(signed char, home_dir,  HOME_DIR);
 
-static void axis_is_at_home(int axis) {
+static void axis_is_at_home(int16_t axis) {
     if (home_dir(axis) < 0)
         current_position[axis] = min_pos[axis] + add_homing[axis];
     else
@@ -403,7 +392,7 @@ static void axis_is_at_home(int axis) {
 // Movement is in two parts:
 // 1) A quick move until the endstop switch is reached.
 // 2) A short backup and then slow move to home for accurately determining the home position.
-static void homeaxis(int axis) {
+static void homeaxis(int16_t axis) {
 #define HOMEAXIS_DO(LETTER) \
   ((LETTER##_MIN_PIN > -1 && LETTER##_HOME_DIR==-1) || (LETTER##_MAX_PIN > -1 && LETTER##_HOME_DIR==1))
   if (axis==X_AXIS ? HOMEAXIS_DO(X) :
@@ -418,7 +407,7 @@ static void homeaxis(int axis) {
     feedrate = homing_feedrate[axis];
     plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate/60, active_extruder);
     st_synchronize();
-    long home_dist_steps_quick_run = st_get_position(axis);
+    int32_t home_dist_steps_quick_run = st_get_position(axis);
     if (!isEndstopHit())
     {
         if (axis == Z_AXIS)
@@ -489,7 +478,7 @@ static void homeaxis(int axis) {
     feedrate = homing_feedrate[axis]/3;
     plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate/60, active_extruder);
     st_synchronize();
-    long home_dist_steps_total = home_dist_steps_quick_run + st_get_position(axis);
+    int32_t home_dist_steps_total = home_dist_steps_quick_run + st_get_position(axis);
     float h_dist = (float(home_dist_steps_total) / axis_steps_per_unit[axis]) * home_dir(axis);
     MSerial.print("home_distance = ");
     MSerial.println(h_dist, 5);
@@ -526,6 +515,70 @@ static void process_command()
       if(!isStopped()) {
         get_arc_coordinates();
         prepare_arc_move(false);
+      }
+      break;
+     case 5: // G5
+      if(!isStopped()) {
+        st_synchronize();
+
+        float max_slip = 1.0; //initial_postion - the_expected_flow...;
+        if (code_seen('P')) max_slip = 1.0 - (code_value()/100.0);
+        // PerMm(axis_steps_per_unit[E_AXIS]);
+
+        real_flow.init();
+        uint16_t previous_flow_position = real_flow.getSensorRaw(active_extruder);
+        int16_t total_flow_delta = 0;
+        uint8_t aborted = 0;
+
+        get_coordinates(); // For X Y Z E F
+        prepare_move();
+
+        float start_e = st_get_position(E_AXIS);
+        if (!blocks_queued())
+          aborted = 1;
+
+        while( blocks_queued() )
+        {
+          watchdog_reset();
+          float e_movement_mm = (st_get_position(E_AXIS) - start_e) / axis_steps_per_unit[E_AXIS];
+          // Need to ignore if flow sensor didn't update
+          if (!real_flow.update() || (abs(e_movement_mm) < 5))
+          {
+            // no flow or small e movement continue
+            continue;
+          }
+
+          uint16_t current_flow_position = real_flow.getSensorRaw(active_extruder);
+          int16_t flow_delta = current_flow_position - previous_flow_position;
+          if (abs(flow_delta) > Flow::SENSOR_RESOLUTION / 2)
+          {
+            if (flow_delta < 0)
+              flow_delta += Flow::SENSOR_RESOLUTION;
+            else
+              flow_delta -= Flow::SENSOR_RESOLUTION;
+          }
+          total_flow_delta += flow_delta;
+          float flow_movement_mm = (total_flow_delta * real_flow.SENSOR_WHEEL_CIRCUM) / float(Flow::SENSOR_RESOLUTION);
+
+          if (abs(e_movement_mm * max_slip) > abs(flow_movement_mm))
+          {
+            quickStop();
+            aborted = 1;
+            MSerial.print("LOG: move aborted, observed slip: ");
+            MSerial.print(100.0 * (1.0-(flow_movement_mm / e_movement_mm)), 4);
+            MSerial.print(" total e move: ");
+            MSerial.print(float(e_movement_mm), 4);
+            MSerial.println(" mm.");
+          }
+//          MSerial.print("e_movement: "); MSerial.println(e_movement_mm, 4);
+//          MSerial.print("flow_movement: "); MSerial.println(flow_movement_mm, 4);
+//          MSerial.print("flow_movement * slip: "); MSerial.println(flow_movement_mm * max_slip, 4);
+          previous_flow_position = current_flow_position;
+        }
+        if (!aborted)
+          MSerial.println("succeeded");
+        else
+          MSerial.println("move_aborted");
       }
       break;
     case 28: // G28 - Home all Axes one at a time
@@ -657,8 +710,8 @@ static void process_command()
 #ifdef ENABLE_BED_LEVELING_PROBE
     case 30: // G30 - Probe Z at current position and report result.
       {
-        int probe_feedrate = 48; // speed (mm/min)
-        int verbosity = 1;  // verbosity (default 1)
+        int16_t probe_feedrate = 48; // speed (mm/min)
+        int16_t verbosity = 1;  // verbosity (default 1)
         float move_distance = CONFIG_BED_LEVELING_Z_MOVE_DISTANCE;  // move distance
         float extra_z_move = 0; // extra z measurement distance for testing (used during debugging)
 
@@ -683,7 +736,7 @@ static void process_command()
       break;
     case 31: // G31 - get/update capacitive sensor base level
       {
-        int verbosity = 0;
+        int16_t verbosity = 0;
 
         if (code_seen('V')) verbosity = code_value_long();
 
@@ -727,7 +780,7 @@ static void process_command()
 
   else if(code_seen('M'))
   {
-    switch( (int)code_value() )
+    switch( (int16_t)code_value() )
     {
     case 17: // M17  - Enable/Power all stepper motors
         enable_x();
@@ -741,8 +794,8 @@ static void process_command()
     {
         if (code_seen('S'))
         {
-            int pin_pwm_value = code_value();
-            int pin_number = -1;
+            int16_t pin_pwm_value = code_value();
+            int16_t pin_number = -1;
             if (code_seen('P') && pin_pwm_value >= 0 && pin_pwm_value <= 255)
             {
                 pin_number = code_value();
@@ -771,7 +824,7 @@ static void process_command()
           w = code_value();
         ledRGBWUpdate(r, g, b, w);
 #if LED_PIN > -1
-        if (Board::getId() != Board::BOARD_2621B)   // 2621 board uses this pin for the case fan
+        if (Board::getId() != Board::BOARD_2621B && Board::getId() != Board::BOARD_V4)   // 2621 board uses this pin for the case fan
         {
             analogWrite(LED_PIN, w);
         }
@@ -945,7 +998,7 @@ static void process_command()
         for(tmp_extruder=0; tmp_extruder<EXTRUDERS; tmp_extruder++)
         {
             SERIAL_ECHOPGM(" T");
-            SERIAL_ECHO(int(tmp_extruder));
+            SERIAL_ECHO(int16_t(tmp_extruder));
             SERIAL_ECHO(':');
             SERIAL_ECHO_F(degHotend(tmp_extruder), 1);
             SERIAL_ECHO('/');
@@ -959,7 +1012,7 @@ static void process_command()
             }
             else
             {
-                SERIAL_ECHO(int(pwr.getActualHeaterOutput(tmp_extruder)));
+                SERIAL_ECHO(int16_t(pwr.getActualHeaterOutput(tmp_extruder)));
             }
             SERIAL_ECHO('p');
             SERIAL_ECHO(hotend_present[tmp_extruder]);
@@ -984,7 +1037,7 @@ static void process_command()
         }
         else
         {
-            SERIAL_ECHO(int(pwr.getActualBedOutput()));
+            SERIAL_ECHO(int16_t(pwr.getActualBedOutput()));
         }
         #endif //TEMP_BED_PIN
       break;
@@ -1008,25 +1061,21 @@ static void process_command()
 
       case 81: // M81  - Turn off Power Supply (ATX Power Off)
         st_synchronize();
-        Board::powerDown();
+        Board::powerDownSafely();
         break;
 
     case 82: // M82  - Set E codes absolute (default)
-      axis_relative_modes[3] = false;
+      axis_relative_modes[E_AXIS] = false;
       break;
     case 83: // M83  - Set E codes relative while in Absolute Coordinates (G90) mode
-      axis_relative_modes[3] = true;
+      axis_relative_modes[E_AXIS] = true;
       break;
     case 18: // Compatibility: M18  - Disable all stepper motors; same as M84
     case 84: // M84  - Disable steppers until next move
       {
-        bool all_axis = !((code_seen(axis_codes[0])) || (code_seen(axis_codes[1])) || (code_seen(axis_codes[2]))|| (code_seen(axis_codes[3])));
+        bool all_axis = !((code_seen(axis_codes[X_AXIS])) || (code_seen(axis_codes[Y_AXIS])) || (code_seen(axis_codes[Z_AXIS]))|| (code_seen(axis_codes[E_AXIS])));
         if(all_axis)
         {
-          st_synchronize();
-          disable_e0();
-          disable_e1();
-          disable_e2();
           finishAndDisableSteppers();
         }
         else
@@ -1084,7 +1133,7 @@ static void process_command()
     case 115: // M115 - Get Firmware Version and Capabilities
         SERIAL_ECHOPGM(" MACHINE_TYPE:UM3");
         SERIAL_ECHOPGM(" PCB_ID:");
-        SERIAL_ECHO(int(Board::getId()));
+        SERIAL_ECHO(int16_t(Board::getId()));
         SERIAL_ECHOLNPGM(" BUILD:\"" __DATE__ " " __TIME__ "\"");
 
         break;
@@ -1239,6 +1288,13 @@ static void process_command()
         if (code_seen('P')) pwr.setMaxPowerUsageForHeater(tmp_extruder, code_value());
     }
     break;
+    case 299: // M299 T<hotend_nr> R<retracted length>
+    {
+        if (setTargetedHotend())
+            break;
+        if (code_seen('R')) st_set_retracted_length(tmp_extruder, code_value());
+    }
+    break;
     case 301: // M301 - Set nozzle PID parameters FF, P, I and D
       {
         if (setTargetedHotend())
@@ -1359,12 +1415,13 @@ static void process_command()
     case 314: // M314 move while measuring wih capacitive sensor
     {
         float move_distance = 0;
-        int move_feedrate = 0;
+        int16_t move_feedrate = 0;
         if (code_seen('Z')) move_distance = code_value();
         if (code_seen('F')) move_feedrate = code_value();
 
         moveWithCapacitiveSensor(move_feedrate, move_distance);
     }
+    break;
 #endif//ENABLE_BED_LEVELING_PROBE
     case 400: // M400 - Finish all moves
     {
@@ -1373,7 +1430,7 @@ static void process_command()
     break;
     case 401: // M401 - Quickstop - Abort all the planned moves. This will stop the head mid-move, so most likely the head will be out of sync with the stepper position after this
     {
-      quickStop();
+      uint8_t _active_extruder = quickStop();
       // quickStop synchronizes current position with the stepper position.
       // so this reports the position we stopped at back to opinicus, nozzle switching during printing should not
       // be a problem as the switching procedure is unabortable.
@@ -1384,7 +1441,16 @@ static void process_command()
       SERIAL_ECHOPGM(" Z");
       MSerial.print(current_position[Z_AXIS], 3);
       SERIAL_ECHOPGM(" E");
-      MSerial.println(current_position[E_AXIS], 3);
+      MSerial.print(current_position[E_AXIS], 3);
+      SERIAL_ECHOPGM(" T");
+      MSerial.print(_active_extruder == 0xff ? active_extruder : _active_extruder, DEC);
+      SERIAL_ECHOPGM(" R0:");
+      MSerial.println(st_get_retracted_length(0), 3);
+#if EXTRUDERS == 2
+      SERIAL_ECHOPGM(" R1:");
+      MSerial.println(st_get_retracted_length(1), 3);
+#endif  //  EXTRUDERS == 2
+
     }
     break;
     case 405: //M405 - Set flow sensor feature enable/disable
@@ -1412,12 +1478,27 @@ static void process_command()
             flow->initFlowData();
     }
     break;
-    case 407: //M407 - Read flow sensor raw value
+    case 407: // M407 - Read flow sensor raw value
     {
         if (code_seen('S'))
         {
             uint8_t nr = code_value();
-            MSerial.println(flowSensor[nr].getAngleWait());
+            MSerial.println(flowSensor[nr]->getAngleWait());
+        }
+    }
+    break;
+    case 408: // M408 S[sensor] P[factor for allowed flow errors]- Set 'allowed_flow_error_factor' for specific flow sensor
+    {
+        if (code_seen('S'))
+        {
+            uint8_t sensor_index = code_value();
+            if(code_seen('P'))
+            {
+                // Internally we work with relative flow (sensor/motor) and we have a lower and upper threshold to triggering EOF.
+                // Outside marlin the minimum extrusion is defined as the minimum sensor movement as portion of the motor movement
+                // Thus we have to recalculate with f = 1 - x
+                flow->setMinimumExtrusionFactor(sensor_index, 1.0f - code_value());
+            }
         }
     }
     break;
@@ -1427,6 +1508,53 @@ static void process_command()
         if(code_seen('Z')) StepperA4988::setCurrent(1, code_value());
         if(code_seen('E')) StepperA4988::setCurrent(2, code_value());
     }
+    case 931: // M931 - Get and reset motion planner buffer statistics
+    {
+        unsigned long  ticks;
+        uint8_t        used;
+        uint8_t        min;
+        uint8_t        motions;
+        uint8_t        underruns;
+        float          x, y, z;
+
+        /* Interrupt-safely copy and reset statistics set in interrupt context */
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+        {
+            used = (block_buffer_head - block_buffer_tail + BLOCK_BUFFER_SIZE) & (BLOCK_BUFFER_SIZE - 1);
+
+            ticks = millis();
+
+            min = planner_min;
+            planner_min = used;
+
+            motions = planner_motions;
+            planner_motions = 0;
+
+            underruns = buffer_underruns;
+            buffer_underruns = 0;
+
+            x = current_position[X_AXIS];
+            y = current_position[Y_AXIS];
+            z = current_position[Z_AXIS];
+        }
+        MSerial.print("LOG:motion buffer stats: ");
+        MSerial.print((uint32_t) ticks, DEC);
+        MSerial.print(",");
+        MSerial.print((int)motions, DEC);
+        MSerial.print(",");
+        MSerial.print((int)min, DEC);
+        MSerial.print(",");
+        MSerial.print((int)planner_max, DEC);
+        MSerial.print(",");
+        MSerial.print((int)underruns, DEC);
+        MSerial.print(",");
+        MSerial.print(x, 5);
+        MSerial.print(",");
+        MSerial.print(y, 5);
+        MSerial.print(",");
+        MSerial.println(z, 5);
+        planner_max = used;
+    }
     break;
     case 998: // M998 - Intentionally stop the system as if by an error.
     {
@@ -1435,8 +1563,8 @@ static void process_command()
     break;
     case 999: // M999 - Restart after being stopped by error
     {
-        // TODO: EM-1379 [New] - Add powerup in clearStopReason?
         clearStopReason();
+        Board::powerUp();
     }
     break;
     case 12000: // M12000 - Set build volume maximum size.
@@ -1473,7 +1601,7 @@ static void process_command()
     break;
     case 12003: //M12003 - Get board type for debugging goals
     {
-        SERIAL_ECHOLN(int(Board::getId()));
+        SERIAL_ECHOLN(int16_t(Board::getId()));
     }
     break;
     case 12004: //M12004 - Set axis direction. Has direct effect.
@@ -1490,7 +1618,7 @@ static void process_command()
             if (!setTargetedHotend())
             {
                 invert_direction[E_AXIS + tmp_extruder] = inverted;
-                flowSensor[tmp_extruder].setDirection(inverted);
+                flowSensor[tmp_extruder]->setDirection(inverted);
             }
         }
     }
@@ -1502,9 +1630,9 @@ static void process_command()
         if (code_seen('T'))
         {
             // Get by reference so we can change the settings
-            GainCompensator& compensator = GainCompensatorFactory::getInstance(GainCompensatorFactory::EXTRUDER, int(code_value()));
+            GainCompensator& compensator = GainCompensatorFactory::getInstance(GainCompensatorFactory::EXTRUDER, int16_t(code_value()));
             SERIAL_ECHOPGM(" index=");
-            MSerial.print(int(code_value()));
+            MSerial.print(int16_t(code_value()));
 
             if (code_seen('F'))
             {
@@ -1543,8 +1671,9 @@ static void process_command()
         }
         SERIAL_ECHOLNPGM(" #");
     }
+    break;
     case 12010: //M12010 - Read/write TMC2130 register
-        if (Board::getId() == Board::BOARD_2621B)
+        if (Board::getId() == Board::BOARD_2621B || Board::getId() == Board::BOARD_V4)
         {
             uint8_t chip_idx = M12010_ALL_DRIVERS;
             uint8_t reg_idx = 0;
@@ -1737,7 +1866,7 @@ void manage_inactivity()
 }
 
 #ifdef FAST_PWM_FAN
-void setPwmFrequency(uint8_t pin, int val)
+void setPwmFrequency(uint8_t pin, int16_t val)
 {
   val &= 0x07;
   switch(digitalPinToTimer(pin))
@@ -1835,9 +1964,9 @@ static bool setTargetedHotend()
  * @param[in] count Number of bytes in the bin array to be converted.
  * @returns Nr of bytes converted, resulting string length is twice as large.
  */
-static int bin2hex(char* hex, const uint8_t* bin, int count)
+static int16_t bin2hex(char* hex, const uint8_t* bin, int16_t count)
 {
-    for (int i = 0; i < count; i++)
+    for (int16_t i = 0; i < count; i++)
     {
         *hex++ = bin_to_hex[*bin >> 4];
         *hex++ = bin_to_hex[*bin++ & 0xf];
@@ -1845,7 +1974,7 @@ static int bin2hex(char* hex, const uint8_t* bin, int count)
     return count;
 }
 
-static int hexNibble2Bin(const char nibble)
+static int16_t hexNibble2Bin(const char nibble)
 {
     if (nibble >= 'a' && nibble <= 'f')
         return nibble - ('a' - 10);
@@ -1863,12 +1992,12 @@ static int hexNibble2Bin(const char nibble)
  * @param[in] buf_size Maximum number of bytes the bin array is going to have.
  * @returns Nr of bytes converted, resulting binary array is half as large.
  */
-static int hex2bin(uint8_t* bin, const char* hex, const int buf_size)
+static int16_t hex2bin(uint8_t* bin, const char* hex, const int16_t buf_size)
 {
-    int count;
+    int16_t count;
     for (count = 0; count < buf_size * 2; count++)
     {
-        int bin_nibble = hexNibble2Bin(*hex++);
+        int16_t bin_nibble = hexNibble2Bin(*hex++);
         if (bin_nibble >= 0)
         {
             // If first nibble.
@@ -1912,7 +2041,7 @@ void check_serial_input_timeout()
     // Check the minimum temperature threshold for bed and hotend(s)
     bool bed_hot = degBed() > MONITOR_MINIMUM_BED_TEMPERATURE;
     bool hotends_hot = false;
-    for (int hotend_index = 0; hotend_index < EXTRUDERS; hotend_index++)
+    for (int16_t hotend_index = 0; hotend_index < EXTRUDERS; hotend_index++)
     {
         hotends_hot = hotends_hot || (degHotend(hotend_index) > MONITOR_MINIMUM_HOTEND_TEMPERATURE);
     }
@@ -1930,7 +2059,7 @@ void check_serial_input_timeout()
 
     // Determine if the elapsed time has passed the timeout. UM3 requests the temperature nearly every 100ms, if
     // this is more than the timeout, it means the other board has stopped working.
-    unsigned long elapsed_time = millis() - start_time_empty_command_buffer;
+    uint32_t elapsed_time = millis() - start_time_empty_command_buffer;
     if (elapsed_time < MONITOR_SERIAL_INPUT_TIMEOUT * 1000UL)
     {
         return;
@@ -2227,7 +2356,7 @@ void pulseLeds()
 
     last_time = millis();
 
-    for (int tool = 0; tool < EXTRUDERS; tool++)
+    for (int16_t tool = 0; tool < EXTRUDERS; tool++)
     {
         if (pulse[tool])
         {

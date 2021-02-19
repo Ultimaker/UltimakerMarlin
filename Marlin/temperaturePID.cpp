@@ -33,7 +33,7 @@
         SERIAL_ECHO(';'); \
         SERIAL_ECHO(d); \
         SERIAL_ECHO(';'); \
-        SERIAL_ECHOLN(int(result)); \
+        SERIAL_ECHOLN(int16_t(result)); \
     }
 
 TemperaturePID::TemperaturePID()
@@ -95,7 +95,7 @@ uint8_t TemperaturePID::update(const float current_temperature)
 
         d_state = (1.0 - K1) * (Kd * temperature_delta) + (K1 * d_state);
         float ff_term = Kff * (target_temperature - FEED_FORWARD_MINIMAL_TEMPERATURE);
-        float pcf_term = Kpcf * getCoolingFanSpeed();
+        float pcf_term = Kpcf * getMaterialCoolingFanSpeed();
 
         result = constrain(ff_term + pcf_term + p_term + i_state - d_state, min_output, max_output);
 

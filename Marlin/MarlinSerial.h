@@ -1,6 +1,6 @@
 /*
   HardwareSerial.h - Hardware serial library for Wiring
-  Copyright (c) 2006 Nicholas Zambetti.  All right reserved.
+  Copyright (c) 2006 Nicholas Zambetti.  All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -29,8 +29,8 @@
 
 // The presence of the UBRRH register is used to detect a UART.
 #define UART_PRESENT(port) ((port == 0 && (defined(UBRRH) || defined(UBRR0H))) || \
-						(port == 1 && defined(UBRR1H)) || (port == 2 && defined(UBRR2H)) || \
-						(port == 3 && defined(UBRR3H)))
+                            (port == 1 && defined(UBRR1H)) || (port == 2 && defined(UBRR2H)) || \
+                            (port == 3 && defined(UBRR3H)))
 
 // These are macros to build serial port register names for the selected SERIAL_PORT (C preprocessor
 // requires two levels of indirection to expand macro values properly)
@@ -65,19 +65,21 @@
 #define BYTE 0
 
 
-#ifndef AT90USB
-// Define constants and variables for buffering incoming serial data.  We're
-// using a ring buffer (I think), in which rx_buffer_head is the index of the
-// location to which to write the next incoming character and rx_buffer_tail
-// is the index of the location from which to read.
-#define RX_BUFFER_SIZE 128
-
+// Define constants and variables for buffering incoming serial data.  We're using a ring buffer (I think), in which rx_buffer_head is the index of the
+// location to which to write the next incoming character and rx_buffer_tail is the index of the location from which to read.
+// 256 is the max limit due to uint8_t head and tail. Use only powers of 2. (...,16,32,64,128,256)
+// 1 message has a maximum length of 66 bytes (start_of_packet[2] + sequence_number[1] + payload_size[1] + payload[MAX_CMD_SIZE] + crc[2], where MAC_CMD_SIZE=60)
+// So with a 256 buffer we can buffer a maximum of 3 messages if the full lenght is used. This will never be the case! So an expected minimum of 4 can be used.
+// Alltough this buffer could theoretically overrun, because of the fact that this buffer is also read very fast, it's very unlikely to have overruns.
+// Therefore the maximum allowed packets to be in transit (on the wire, meaning that have not be acknowled yet) can be 1 higher then the expected minimum: 5 messages.
+// Even in case of an overrun, the protocol implemented will correct itself!
+#define RX_BUFFER_SIZE 256
 
 struct ring_buffer
 {
   unsigned char buffer[RX_BUFFER_SIZE];
-  int head;
-  int tail;
+  volatile uint8_t head;
+  volatile uint8_t tail;
 };
 
 #if UART_PRESENT(SERIAL_PORT)
@@ -89,22 +91,24 @@ class MarlinSerial //: public Stream
 
   public:
     MarlinSerial();
-    void begin(long);
+    void begin(int32_t);
     void end();
-    int peek(void);
-    int read(void);
+    int16_t peek(void);
+    int16_t read(void);
     void flush(void);
 
-    FORCE_INLINE int available(void)
+    FORCE_INLINE int16_t available(void)
     {
-      return (unsigned int)(RX_BUFFER_SIZE + rx_buffer.head - rx_buffer.tail) % RX_BUFFER_SIZE;
+      return (uint16_t)(RX_BUFFER_SIZE + rx_buffer.head - rx_buffer.tail) % RX_BUFFER_SIZE;
     }
 
-    FORCE_INLINE void write(uint8_t c)
+    FORCE_INLINE void write(const uint8_t c)
     {
+      /* Wait for empty transmit buffer */
       while (!((M_UCSRxA) & (1 << M_UDREx)))
         ;
 
+      /* Put data into buffer, sends the data */
       M_UDRx = c;
     }
 
@@ -113,7 +117,7 @@ class MarlinSerial //: public Stream
     {
       if((M_UCSRxA & (1<<M_RXCx)) != 0) {
         unsigned char c  =  M_UDRx;
-        int i = (unsigned int)(rx_buffer.head + 1) % RX_BUFFER_SIZE;
+        uint8_t i = (uint16_t(rx_buffer.head) + 1) % RX_BUFFER_SIZE;
 
         // if we should be storing the received character into the location
         // just before the tail (meaning that the head would advance to the
@@ -127,12 +131,13 @@ class MarlinSerial //: public Stream
     }
 
 
-  private:
-    void printNumber(unsigned long, uint8_t);
+    private:
+    void printNumber(uint32_t, uint8_t);
     void printFloat(double, uint8_t);
 
 
   public:
+
     FORCE_INLINE void write(const char *str)
     {
       while (*str)
@@ -148,36 +153,35 @@ class MarlinSerial //: public Stream
 
     FORCE_INLINE void print(const String &s)
     {
-      for (int i = 0; i < (int)s.length(); i++) {
+      for (int16_t i = 0; i < (int16_t)s.length(); i++) {
         write(s[i]);
       }
     }
 
-    FORCE_INLINE void print(const char *str)
+    FORCE_INLINE void print(const char* const str)
     {
       write(str);
     }
-    void print(char, int = BYTE);
-    void print(unsigned char, int = BYTE);
-    void print(int, int = DEC);
-    void print(unsigned int, int = DEC);
-    void print(long, int = DEC);
-    void print(unsigned long, int = DEC);
-    void print(double, int = 2);
+    void print(char, int16_t = BYTE);
+    void print(unsigned char, int16_t = BYTE);
+    void print(int16_t, int16_t = DEC);
+    void print(uint16_t, int16_t = DEC);
+    void print(int32_t, int16_t = DEC);
+    void print(uint32_t, int16_t = DEC);
+    void print(double, int16_t = 2);
 
     void println(const String &s);
     void println(const char[]);
-    void println(char, int = BYTE);
-    void println(unsigned char, int = BYTE);
-    void println(int, int = DEC);
-    void println(unsigned int, int = DEC);
-    void println(long, int = DEC);
-    void println(unsigned long, int = DEC);
-    void println(double, int = 2);
+    void println(char, int16_t = BYTE);
+    void println(unsigned char, int16_t = BYTE);
+    void println(int16_t, int16_t = DEC);
+    void println(uint16_t, int16_t = DEC);
+    void println(int32_t, int16_t = DEC);
+    void println(uint32_t, int16_t = DEC);
+    void println(double, int16_t = 2);
     void println(void);
 };
 
 extern MarlinSerial MSerial;
-#endif // !AT90USB
 
 #endif

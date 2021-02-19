@@ -22,6 +22,7 @@
 #include "pins.h"
 #include "watchdog.h"
 #include "Marlin.h"
+#include "stepper.h"
 
 #define __USE_DEBUG_LEDS__
 #include "DebugLeds.h"
@@ -57,9 +58,9 @@ void Board::detect()
         return;
     }
 
-    Board::powerDown();
+    powerDown();
 
-    int16_t main_board_voltage = analogRead(ADC_INPUT_VOLTAGE_PIN);
+    int16_t main_board_voltage = analogRead(ADC_BOARD_ID_PIN);
     if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_V2_0))
     {
         board_id = BOARD_V2_0;
@@ -74,7 +75,32 @@ void Board::detect()
     }
     else if (isWithinTolerance(main_board_voltage, MAIN_BOARD_ADC_2621B))
     {
-        board_id = BOARD_2621B;
+        /* To differentiate we only need one pin, set the unneeded pins to a defined state,
+         * by writing a logical one to the pin we enable the internal pull-up. BOARD_REV_XSB_PIN
+         * is introduced in BOARD_V4 and is not used in older versions.
+         */
+
+        /* Set the board revision pins to input */
+        SET_INPUT(BOARD_REV_LSB_PIN);
+        SET_INPUT(BOARD_REV_XSB_PIN);
+        SET_INPUT(BOARD_REV_MSB_PIN);
+        WRITE(BOARD_REV_XSB_PIN, 1);
+        WRITE(BOARD_REV_MSB_PIN, 1);
+
+        unsigned char revision = READ(BOARD_REV_LSB_PIN);
+
+        switch (revision)
+        {
+            case 0:
+                board_id = BOARD_2621B;
+                break;
+            case 1:
+                board_id = BOARD_V4;
+                break;
+            default:
+                board_id = BOARD_UNKNOWN;
+                break;
+        }
     }
     else
     {
@@ -88,12 +114,20 @@ void Board::detect()
 // Note that we can only call analogRead() before temperatureInit() as temperatureInit takes over control of the ADC peripheral.
 uint8_t Board::init()
 {
-    if (getId() == Board::BOARD_2621B)
+    if (board_id  == BOARD_2621B || board_id == BOARD_V4)
     {
         return initBoard2621B();
     }
 
     return 0;
+}
+
+void Board::powerDownSafely()
+{
+    // A sudden drop in the power supply can damage the stepper drivers.
+    // By disabling the steppers before switching off the 24V power supply we prevent this.
+    disable_all_steppers();
+    powerDown();
 }
 
 void Board::powerDown()
@@ -103,7 +137,7 @@ void Board::powerDown()
     WRITE(PS_ON_PIN, PS_ON_ASLEEP);
     #endif
 
-    if (getId() == Board::BOARD_REV_I)
+    if (board_id == BOARD_REV_I)
     {
         // Board revision I and higher have removed the safety circuit. But only rev I needs to implement this pin hack!
         // This means SAFETY_TRIGGERED_PIN has to be turned as output and switched to HIGH.
@@ -118,7 +152,7 @@ void Board::powerUp()
     // Right now we cannot power up the BOARD_2621B because this would need the sequence like the one performed during init.
     // This sequence is now not possible since the ADC cannot be accessed at this time anymore.
     // TODO: EM-2760 [New] - fix this. We want to enable power on connection to Opinicus and not earlier
-    if (getId() != Board::BOARD_2621B)
+    if (board_id != BOARD_2621B && board_id != BOARD_V4)
     {
         #if defined(PS_ON_PIN) && PS_ON_PIN > -1
         SET_OUTPUT(PS_ON_PIN); // GND
@@ -126,7 +160,7 @@ void Board::powerUp()
         #endif
     }
 
-    if (getId() == Board::BOARD_REV_I)
+    if (board_id == BOARD_REV_I)
     {
         // Board revision I and higher have removed the safety circuit. But only rev I needs to implement this pin hack!
         // This means SAFETY_TRIGGERED_PIN has to be turned as output and switched to LOW.
@@ -142,9 +176,8 @@ void Board::powerUp()
 uint8_t Board::executePreInit()
 {
     SERIAL_ECHOLNPGM("INIT: pre init");
-    uint8_t board_id = getId();
 
-    if (board_id == Board::BOARD_2621B)
+    if (board_id == BOARD_2621B || board_id == BOARD_V4)
     {
         INITIALIZE_DEBUG_LEDS;
         SWITCH_ON_DEBUG_LED(DEBUG_LED0);
@@ -157,7 +190,7 @@ uint8_t Board::executePreInit()
         WRITE(POWER_FAIL_N_PIN, HIGH);      // initialize as pull up
 
         // Wait for Power Fail input to become high, i.e. no power error.
-        unsigned long start_time = millis();
+        uint32_t start_time = millis();
         while ( !READ(POWER_FAIL_N_PIN) )
         {
             // If after half a second, this pin is not high, something is wrong, discontinue.
@@ -177,9 +210,8 @@ uint8_t Board::executePreInit()
 uint8_t Board::executePostInit()
 {
     SERIAL_ECHOLNPGM("INIT: post init");
-    uint8_t board_id = getId();
 
-    if (board_id == Board::BOARD_2621B)
+    if (board_id == BOARD_2621B || board_id == BOARD_V4)
     {
         SWITCH_OFF_DEBUG_LED(DEBUG_LED0);
         SWITCH_OFF_DEBUG_LED(DEBUG_LED1);
@@ -201,7 +233,7 @@ uint8_t Board::initBoard2621B()
     // turned on to make sure that the inrush current limiter operates
     // as designed. The voltage may be higher if the switch was on just
     // before we got here.
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     int16_t high_power_voltage = analogRead(ADC_OUTPUT_VOLTAGE_PIN);
     do
     {
@@ -246,5 +278,5 @@ bool Board::isWithinTolerance(const int16_t analog_value, const int16_t adc_cons
 
 bool Board::hasCaseFans()
 {
-    return board_id == Board::BOARD_2621B;
+    return board_id == BOARD_2621B || board_id == BOARD_V4;
 }

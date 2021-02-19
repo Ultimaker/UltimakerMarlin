@@ -24,25 +24,21 @@
 #ifndef planner_h
 #define planner_h
 
+#include <limits.h>
+
 #include "Marlin.h"
 
 // This struct is used when buffering the setup for each linear movement "nominal" values are as specified in
 // the source g-code and may never actually be reached if acceleration management is active.
 typedef struct {
   // Fields used by the bresenham algorithm for tracing the line
-  long steps_x, steps_y, steps_z, steps_e;  // Step count along each axis
-  unsigned long step_event_count;           // The number of step events required to complete this block
-  long accelerate_until;                    // The index of the step event on which to stop acceleration
-  long decelerate_after;                    // The index of the step event on which to start decelerating
-  long acceleration_rate;                   // The acceleration rate used for acceleration calculation
+  int32_t steps_x, steps_y, steps_z, steps_e;  // Step count along each axis
+  uint32_t step_event_count;           // The number of step events required to complete this block
+  int32_t accelerate_until;                    // The index of the step event on which to stop acceleration
+  int32_t decelerate_after;                    // The index of the step event on which to start decelerating
+  int32_t acceleration_rate;                   // The acceleration rate used for acceleration calculation
   unsigned char direction_bits;             // The direction bit set for this block (refers to *_DIRECTION_BIT in config.h)
   unsigned char active_extruder;            // Selects the active extruder
-  #ifdef ADVANCE
-    long advance_rate;
-    volatile long initial_advance;
-    volatile long final_advance;
-    float advance;
-  #endif
 
   // Fields used by the motion planner to manage acceleration
 //  float speed_x, speed_y, speed_z, speed_e;        // Nominal mm/sec for each axis
@@ -55,15 +51,11 @@ typedef struct {
   unsigned char nominal_length_flag;                 // Planner flag for nominal speed always reached
 
   // Settings for the trapezoid generator
-  unsigned long nominal_rate;                        // The nominal step rate for this block in step_events/sec
-  unsigned long initial_rate;                        // The jerk-adjusted step rate at start of block
-  unsigned long final_rate;                          // The minimal rate at exit
-  unsigned long acceleration_st;                     // acceleration steps/sec^2
-  unsigned long fan_speed;
-  #ifdef BARICUDA
-  unsigned long valve_pressure;
-  unsigned long e_to_p_pressure;
-  #endif
+  uint32_t nominal_rate;                        // The nominal step rate for this block in step_events/sec
+  uint32_t initial_rate;                        // The jerk-adjusted step rate at start of block
+  uint32_t final_rate;                          // The minimal rate at exit
+  uint32_t acceleration_st;                     // acceleration steps/sec^2
+  uint32_t fan_speed;
   volatile char busy;
 } block_t;
 
@@ -81,13 +73,12 @@ void plan_set_e_position(const float &e);
 
 
 void check_axes_activity();
-uint8_t movesplanned(); //return the nr of buffered moves
+uint8_t plan_buf_free_positions();  // return the number of free positions in the planner buffer.
 
-extern unsigned long minsegmenttime;
+extern uint32_t minsegmenttime;
 extern float max_feedrate[NUM_AXIS]; // set the max speeds
 extern float axis_steps_per_unit[NUM_AXIS];
-extern float volume_to_filament_length[EXTRUDERS];
-extern unsigned long max_acceleration_units_per_sq_second[NUM_AXIS]; // Use M201 to override by software
+extern uint32_t max_acceleration_units_per_sq_second[4]; // Use M201 to override by software
 extern float minimumfeedrate;
 extern float acceleration;         // Normal acceleration mm/s^2  THIS IS THE DEFAULT ACCELERATION for all moves. M204 SXXXX
 extern float retract_acceleration; //  mm/s^2   filament pull-pack and push-forward  while standing still in the other axis M204 TXXXX
@@ -95,16 +86,12 @@ extern float max_xy_jerk;          //speed that can be stopped at once, if I und
 extern float max_z_jerk;
 extern float max_e_jerk;
 extern float mintravelfeedrate;
-extern unsigned long axis_steps_per_sqr_second[NUM_AXIS];
+extern uint32_t axis_steps_per_sqr_second[NUM_AXIS];
 
-#ifdef AUTOTEMP
-    extern bool autotemp_enabled;
-    extern float autotemp_max;
-    extern float autotemp_min;
-    extern float autotemp_factor;
-#endif
-
-
+/* Motion planner buffer statistics */
+extern uint8_t  planner_min;
+extern uint8_t  planner_motions;
+extern uint8_t  buffer_underruns;
 
 
 extern block_t block_buffer[BLOCK_BUFFER_SIZE];            // A ring buffer for motion instructions
@@ -115,7 +102,17 @@ extern volatile unsigned char block_buffer_tail;
 FORCE_INLINE void plan_discard_current_block()
 {
   if (block_buffer_head != block_buffer_tail) {
+    uint8_t  used;
+
     block_buffer_tail = (block_buffer_tail + 1) & (BLOCK_BUFFER_SIZE - 1);
+
+    used = (block_buffer_head - block_buffer_tail + BLOCK_BUFFER_SIZE) & (BLOCK_BUFFER_SIZE - 1);
+    if (!used && buffer_underruns < UCHAR_MAX)
+      buffer_underruns++;
+    if (used < planner_min)
+      planner_min = used;
+    if (planner_motions < UCHAR_MAX)
+      planner_motions++;
   }
 }
 

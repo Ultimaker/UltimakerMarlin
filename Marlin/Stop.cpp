@@ -18,6 +18,7 @@
 #include "Marlin.h"
 #include "temperature.h"
 #include "Board.h"
+#include "stepper.h"
 
 static uint8_t stopped_reason = 0;             // 0 == not stopped, other value == stop reason
 
@@ -25,7 +26,7 @@ static uint8_t stopped_reason = 0;             // 0 == not stopped, other value 
 void stop(uint8_t reasonNr)
 {
     disable_all_heaters();
-    Board::powerDown();
+    Board::powerDownSafely();
     if(stopped_reason == 0)
     {
         stopped_reason = reasonNr;

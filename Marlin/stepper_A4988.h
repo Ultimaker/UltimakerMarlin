@@ -24,10 +24,10 @@
 class StepperA4988
 {
 private:
-    static int motor_current_setting[3];
+    static int16_t motor_current_setting[3];
 public:
     static void init();
-    static void setCurrent(uint8_t driver, int current);
+    static void setCurrent(uint8_t driver, int16_t current);
 };
 
 #endif//STEPPER_A4988_H

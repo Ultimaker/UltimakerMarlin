@@ -96,12 +96,10 @@ private:
         STATE_SAMPLE_NEXT,
         STATE_WAIT,
     } state;
-    /** @brief Delay counter, if contains a value higher than 1, it will delay the state machine update by this many miliseconds. */
-    uint8_t delay;
     /** @brief Current actively sampling channel number, goes from 0 to 2, managed by the internal state machine */
     uint8_t sample_channel_nr;
     /** @brief Keep track of the last milli second time that we did an update. This to prevent updating in a tight loop */
-    unsigned long last_update_time;
+    uint32_t last_update_time;
 
     /** @brief To store the results internally (only last value read) */
     int16_t results[MAX_CHANNELS];

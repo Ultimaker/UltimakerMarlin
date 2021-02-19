@@ -57,12 +57,6 @@ set(ARDUINO_SOURCES
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring.c
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_analog.c
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_digital.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_pulse.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/wiring_shift.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WInterrupts.c
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WMath.cpp
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/WString.cpp
-	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/Print.cpp
 	${ARDUINO_INSTALL_DIR}/hardware/arduino/cores/arduino/main.cpp
 )
 

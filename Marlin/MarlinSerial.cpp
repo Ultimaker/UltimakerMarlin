@@ -1,6 +1,6 @@
 /*
   HardwareSerial.cpp - Hardware serial library for Wiring
-  Copyright (c) 2006 Nicholas Zambetti.  All right reserved.
+  Copyright (c) 2006 Nicholas Zambetti.  All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include "Marlin.h"
 #include "MarlinSerial.h"
 
-#ifndef AT90USB
 // this next line disables the entire HardwareSerial.cpp,
 // this is so I can support Attiny series and any other chip without a UART
 #if defined(UBRRH) || defined(UBRR0H) || defined(UBRR1H) || defined(UBRR2H) || defined(UBRR3H)
@@ -34,7 +33,7 @@
 
 FORCE_INLINE void store_char(unsigned char c)
 {
-  int i = (unsigned int)(rx_buffer.head + 1) % RX_BUFFER_SIZE;
+  uint8_t i = (uint16_t(rx_buffer.head) + 1) % RX_BUFFER_SIZE;
 
   // if we should be storing the received character into the location
   // just before the tail (meaning that the head would advance to the
@@ -67,13 +66,13 @@ MarlinSerial::MarlinSerial()
 
 // Public Methods //////////////////////////////////////////////////////////////
 
-void MarlinSerial::begin(long baud)
+void MarlinSerial::begin(int32_t baud)
 {
   uint16_t baud_setting;
   bool useU2X = true;
 
 #if F_CPU == 16000000UL && SERIAL_PORT == 0
-  // hard coded exception for compatibility with the bootloader shipped
+  // Hard coded exception for compatibility with the bootloader shipped
   // with the Duemilanove and previous boards and the firmware on the 8U2
   // on the Uno and Mega 2560.
   if (baud == 57600) {
@@ -105,9 +104,7 @@ void MarlinSerial::end()
   cbi(M_UCSRxB, M_RXCIEx);
 }
 
-
-
-int MarlinSerial::peek(void)
+int16_t MarlinSerial::peek(void)
 {
   if (rx_buffer.head == rx_buffer.tail) {
     return -1;
@@ -116,14 +113,14 @@ int MarlinSerial::peek(void)
   }
 }
 
-int MarlinSerial::read(void)
+int16_t MarlinSerial::read(void)
 {
   // if the head isn't ahead of the tail, we don't have any characters
   if (rx_buffer.head == rx_buffer.tail) {
     return -1;
   } else {
     unsigned char c = rx_buffer.buffer[rx_buffer.tail];
-    rx_buffer.tail = (unsigned int)(rx_buffer.tail + 1) % RX_BUFFER_SIZE;
+    rx_buffer.tail = (uint16_t)(rx_buffer.tail + 1) % RX_BUFFER_SIZE;
     return c;
   }
 }
@@ -142,35 +139,29 @@ void MarlinSerial::flush()
   rx_buffer.head = rx_buffer.tail;
 }
 
-
-
-
 /// imports from print.h
 
-
-
-
-void MarlinSerial::print(char c, int base)
+void MarlinSerial::print(char c, int16_t base)
 {
-  print((long) c, base);
+  print((int32_t) c, base);
 }
 
-void MarlinSerial::print(unsigned char b, int base)
+void MarlinSerial::print(unsigned char b, int16_t base)
 {
-  print((unsigned long) b, base);
+  print((uint32_t) b, base);
 }
 
-void MarlinSerial::print(int n, int base)
+void MarlinSerial::print(int16_t n, int16_t base)
 {
-  print((long) n, base);
+  print((int32_t) n, base);
 }
 
-void MarlinSerial::print(unsigned int n, int base)
+void MarlinSerial::print(uint16_t n, int16_t base)
 {
-  print((unsigned long) n, base);
+  print((uint32_t) n, base);
 }
 
-void MarlinSerial::print(long n, int base)
+void MarlinSerial::print(int32_t n, int16_t base)
 {
   if (base == 0) {
     write(n);
@@ -185,20 +176,19 @@ void MarlinSerial::print(long n, int base)
   }
 }
 
-void MarlinSerial::print(unsigned long n, int base)
+void MarlinSerial::print(uint32_t n, int16_t base)
 {
   if (base == 0) write(n);
   else printNumber(n, base);
 }
 
-void MarlinSerial::print(double n, int digits)
+void MarlinSerial::print(double n, int16_t digits)
 {
   printFloat(n, digits);
 }
 
 void MarlinSerial::println(void)
 {
-  print('\r');
   print('\n');
 }
 
@@ -214,43 +204,43 @@ void MarlinSerial::println(const char c[])
   println();
 }
 
-void MarlinSerial::println(char c, int base)
+void MarlinSerial::println(char c, int16_t base)
 {
   print(c, base);
   println();
 }
 
-void MarlinSerial::println(unsigned char b, int base)
+void MarlinSerial::println(unsigned char b, int16_t base)
 {
   print(b, base);
   println();
 }
 
-void MarlinSerial::println(int n, int base)
+void MarlinSerial::println(int16_t n, int16_t base)
 {
   print(n, base);
   println();
 }
 
-void MarlinSerial::println(unsigned int n, int base)
+void MarlinSerial::println(uint16_t n, int16_t base)
 {
   print(n, base);
   println();
 }
 
-void MarlinSerial::println(long n, int base)
+void MarlinSerial::println(int32_t n, int16_t base)
 {
   print(n, base);
   println();
 }
 
-void MarlinSerial::println(unsigned long n, int base)
+void MarlinSerial::println(uint32_t n, int16_t base)
 {
   print(n, base);
   println();
 }
 
-void MarlinSerial::println(double n, int digits)
+void MarlinSerial::println(double n, int16_t digits)
 {
   print(n, digits);
   println();
@@ -258,10 +248,10 @@ void MarlinSerial::println(double n, int digits)
 
 // Private Methods /////////////////////////////////////////////////////////////
 
-void MarlinSerial::printNumber(unsigned long n, uint8_t base)
+void MarlinSerial::printNumber(uint32_t n, uint8_t base)
 {
-  unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars.
-  unsigned long i = 0;
+  unsigned char buf[8 * sizeof(int32_t)]; // Assumes 8-bit chars.
+  uint32_t i = 0;
 
   if (n == 0) {
     print('0');
@@ -296,7 +286,7 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
   number += rounding;
 
   // Extract the integer part of the number and print it
-  unsigned long int_part = (unsigned long)number;
+  uint32_t int_part = (uint32_t)number;
   double remainder = number - (double)int_part;
   print(int_part);
 
@@ -308,7 +298,7 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
   while (digits-- > 0)
   {
     remainder *= 10.0;
-    int toPrint = int(remainder);
+    int16_t toPrint = int16_t(remainder);
     print(toPrint);
     remainder -= toPrint;
   }
@@ -319,4 +309,3 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
 MarlinSerial MSerial;
 
 #endif // whole file
-#endif // !AT90USB

@@ -23,7 +23,7 @@ const char protocol_error_magic[] PROGMEM = "\nProtoError:";
 #define SERIAL_PROTOCOL_ERROR_START serialprintPGM(protocol_error_magic);
 
 /* Converts the sequence number (byte) to int */
-#define SERIAL_ECHO_BYTE_AS_NR_LN(x) SERIAL_ECHOLN(int(x))
+#define SERIAL_ECHO_BYTE_AS_NR_LN(x) SERIAL_ECHOLN(int16_t(x))
 
 uint8_t SerialProtocol::receive_packet_number = 0;
 Crc8    SerialProtocol::response_crc8;
@@ -55,7 +55,7 @@ void SerialProtocol::readCommand(callback_handle_packet_t callback)
 
     while (MSerial.available() > 0)
     {
-        int serial_input = MSerial.read();
+    	int16_t serial_input = MSerial.read();
         if (serial_input == -1)
         {
             return;
@@ -97,7 +97,7 @@ void SerialProtocol::readCommand(callback_handle_packet_t callback)
                     // Wrong expected sequence number, ignore complete packet, ask for resend of the expected sequence number
                     SERIAL_PROTOCOL_ERROR_START;
                     SERIAL_ECHOPGM(MSG_ERR_UNEXPECTED_SEQUENCE_NUMBER);
-                    SERIAL_ECHO((unsigned int)serial_char);
+                    SERIAL_ECHO((uint16_t)serial_char);
                     SERIAL_ECHO(",");
                     SERIAL_ECHO_BYTE_AS_NR_LN(receive_packet_number);
                     // An unfortunate dependency on the planner; In the future, we need to push this number into this function, instead of pulling it here

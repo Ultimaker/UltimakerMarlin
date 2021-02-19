@@ -25,7 +25,7 @@ static uint8_t led_command_buffer[5];
 
 void ledRGBWInit()
 {
-    if (Board::getId() == Board::BOARD_2621B)
+    if (Board::getId() == Board::BOARD_2621B || Board::getId() == Board::BOARD_V4)
     {
         return;
     }
@@ -50,7 +50,7 @@ void ledRGBWInit()
 
 void ledRGBWUpdate(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
-    if (Board::getId() == Board::BOARD_2621B)
+    if (Board::getId() == Board::BOARD_2621B || Board::getId() == Board::BOARD_V4)
     {
         // The main case leds are now handled by the Olimex
         return;

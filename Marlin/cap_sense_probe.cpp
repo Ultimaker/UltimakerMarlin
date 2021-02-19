@@ -29,6 +29,9 @@
    these without extensive testing.
 */
 
+#include "Configuration.h"
+#ifdef ENABLE_BED_LEVELING_PROBE
+
 #include "Marlin.h"
 #include "i2c_capacitance_FDC1004.h"
 #include "cap_sense_probe.h"
@@ -79,7 +82,7 @@ struct WorkPacket
     enum probe_state_t state;
     const char* error_message;
     float z;
-    int debuglevel;             // from V option
+    int16_t debuglevel;             // from V option
     // An inflection point is a point on a curve where the curve changes from being concave to convex or vice versa.
     int64_t inflection;
     int64_t inflection_max;    // the maximum inflection so far
@@ -109,7 +112,7 @@ static void statPushSample(struct stat_t *stat, int64_t x, int64_t y)
 }
 
 // Overload of statPushSample for lower precision data
-static void statPushSample(struct stat_t *stat, long x, long y)
+static void statPushSample(struct stat_t *stat, int32_t x, int32_t y)
 {
     statPushSample(stat, int64_t(x), int64_t(y));
 }
@@ -125,7 +128,7 @@ static void statPopSample(struct stat_t *stat, int64_t x, int64_t y)
 }
 
 // Overload of statPopSample for lower precision data
-static void statPopSample(struct stat_t *stat, long x, long y)
+static void statPopSample(struct stat_t *stat, int32_t x, int32_t y)
 {
     statPopSample(stat, int64_t(x), int64_t(y));
 }
@@ -133,7 +136,7 @@ static void statPopSample(struct stat_t *stat, long x, long y)
 static void processSample(uint16_t sample_value, float sample_z)
 {
     // sample counter, also used as abscissa data for regression
-    static long counter = -1;
+    static int32_t counter = -1;
 
     // data buffers (used as ring buffers)
     static uint16_t cbuf[SAMPLE_BUFFER_1_SIZE + SAMPLE_BUFFER_2_SIZE]; // capacitive data sample buffer
@@ -378,7 +381,7 @@ static void processSample(uint16_t sample_value, float sample_z)
         workPacket.inflection < CONFIG_BED_LEVELING_PEAK_DET2N * (workPacket.inflection_max / CONFIG_BED_LEVELING_PEAK_DET2D))
     {
         float index;
-        int offset, offset1;
+        int16_t offset, offset1;
 
         // peak found!
         workPacket.state = DONE;
@@ -389,8 +392,8 @@ static void processSample(uint16_t sample_value, float sample_z)
         index = intersection_sample_count - (float(counter) - (SAMPLE_BUFFER_1_SIZE + SAMPLE_BUFFER_2_SIZE - 1));
 
         // index is offset from write_pointer in circular buffer
-        offset  = BUFMOD(write_pointer + (int)index);
-        offset1 = BUFMOD(write_pointer + (int)index + 1);
+        offset  = BUFMOD(write_pointer + (int16_t)index);
+        offset1 = BUFMOD(write_pointer + (int16_t)index + 1);
 
         if (index < 0)
         {
@@ -406,7 +409,7 @@ static void processSample(uint16_t sample_value, float sample_z)
             return;
         }
 
-        workPacket.z = zbuf[offset] + (zbuf[offset1] - zbuf[offset]) * (index - (int)index);
+        workPacket.z = zbuf[offset] + (zbuf[offset1] - zbuf[offset]) * (index - (int16_t)index);
         if (workPacket.debuglevel > 0)
         {
             MSerial.print("# z ");
@@ -445,14 +448,14 @@ static int16_t captureSample()
     return 0;
 }
 
-static void doTheProbing(const float start_position[], const int feedrate, const float extra_z_move)
+static void doTheProbing(const float start_position[], const int16_t feedrate, const float extra_z_move)
 {
-    int t0 = millis();
+	int16_t t0 = millis();
 
     // Loop for as long as the Z-axis is moving.
     while (blocks_queued())
     {
-        int t1 = millis();
+    	int16_t t1 = millis();
         int16_t sample_value = captureSample();    // returns 0 on error.
         if (sample_value == 0)
         {
@@ -480,18 +483,18 @@ static void doTheProbing(const float start_position[], const int feedrate, const
 
         float zf = float(st_get_position(Z_AXIS)) / axis_steps_per_unit[Z_AXIS];
 
-        int t2 = millis();
+        int16_t t2 = millis();
         if (workPacket.state != CONTINUE)
             processSample(sample_value, zf);    // processSample expects positive input values. Since we checked sample_value to be positive this is true.
 
-        int t3 = millis();
+        int16_t t3 = millis();
         if (workPacket.debuglevel)
         {
             MSerial.print(zf, 5);
             MSerial.print(" ");
             MSerial.print(sample_value);
             MSerial.print(" ");
-            MSerial.print((long)workPacket.inflection);
+            MSerial.print((int32_t)workPacket.inflection);
             MSerial.print(" ");
             MSerial.print(workPacket.reject_count);
             MSerial.print(" ");
@@ -532,7 +535,7 @@ static void doTheProbing(const float start_position[], const int feedrate, const
     }
 }
 
-ProbeResult probeWithCapacitiveSensor(const float start_position[], const int feedrate, const int verbosity, const float move_distance, const float extra_z_move)
+ProbeResult probeWithCapacitiveSensor(const float start_position[], const int16_t feedrate, const int16_t verbosity, const float move_distance, const float extra_z_move)
 {
     // Prepare for probing
     stop_heaters_pwm = true;
@@ -576,13 +579,14 @@ ProbeResult probeWithCapacitiveSensor(const float start_position[], const int fe
     return probe_result;
 }
 
-void moveWithCapacitiveSensor(const int feedrate, const float move_distance)
+void moveWithCapacitiveSensor(const int16_t feedrate, const float move_distance)
 {
+    st_synchronize();
+
     // prepare for move
     stop_heaters_pwm = true;
     manage_heater();
 
-    st_synchronize();
 
     disable_x();
     disable_y();
@@ -597,10 +601,10 @@ void moveWithCapacitiveSensor(const int feedrate, const float move_distance)
                      current_position[E_AXIS], float(feedrate)/60, active_extruder);
 
     current_position[Z_AXIS] -= move_distance;
-    unsigned long t0 = millis();
+    uint32_t t0 = millis();
     while (blocks_queued())
     {
-        unsigned long t1 = millis();
+    	uint32_t t1 = millis();
         int16_t sample_value = captureSample();
         float zf = float(st_get_position(Z_AXIS)) / axis_steps_per_unit[Z_AXIS];
 
@@ -657,7 +661,7 @@ static int16_t getCAPDACSample(uint8_t capdac_level)
 */
 #define CAPDAC_MAX_STEPS 32
 
-void calibrateCapacitanceOffset(int verbosity)
+void calibrateCapacitanceOffset(int16_t verbosity)
 {
     int16_t value;
     uint8_t capdac_level;
@@ -725,7 +729,7 @@ void calibrateCapacitanceOffset(int verbosity)
     MSerial.println("ERROR:CAPACITIVE_SENSOR_PROBLEM:cannot compensate static capacitance (sensor shorted?)");
 }
 
-void updateCapacitiveSensorBaseline(int verbosity)
+void updateCapacitiveSensorBaseline(int16_t verbosity)
 {
     int32_t total_cap_value = int32_t(captureSample()) + captureSample() + captureSample();
     capacitive_baseline = total_cap_value / 3;
@@ -736,3 +740,5 @@ void updateCapacitiveSensorBaseline(int verbosity)
         MSerial.println(capacitive_baseline, DEC);
     }
 }
+
+#endif // ENABLE_BED_LEVELING_PROBE

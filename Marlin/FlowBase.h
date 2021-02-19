@@ -39,10 +39,15 @@ public:
 
     // @brief  Initialize all flow position variables.
     virtual void initFlowData() {};
-
+ 
     // @brief   Configures the number of feeder steps required to move the filament 1mm.
     // @param   stepsPerMm is the number of steps to move the filament 1mm [float].
     virtual void setStepsPerMm(float stepsPerMm) {(void)stepsPerMm;};
+
+    // @brief Sets the minimal extrusion as a factor of the desired extrusion
+    // @param sensor_index The index of the sensor to set the factor for.
+    // @param factor Factor to use.
+    virtual void setMinimumExtrusionFactor(uint8_t /*sensor_index*/, float /*factor*/) {};
 
     // @brief   Set output rate (averaging) for all flow sensors.
     // @param   output_rate configures the refresh rate of the angle data, i.e. how many samples are averaged before output.
@@ -74,7 +79,7 @@ public:
     // @brief   Update the position tracking and flow sensor data.
     //          This function should be called at frequent intervals during printing (the more often is better for higher accuracy).
     //          In order to reduce system load this function will only do something when more than 1mm3 has been extruded.
-    virtual void update() {};
+    virtual uint8_t update() { return 0; };
 
     // @brief   Update extrusion flow position for active extruder.
     // @param   e_pos_in_steps is the number of feeder steps you want to set. Used when there is a sudden E-change without actual

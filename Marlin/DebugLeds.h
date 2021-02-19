@@ -17,13 +17,22 @@
 #ifndef DEBUG_LEDS_H
 #define DEBUG_LEDS_H
 
-// Define the Debug Leds
-#define DEBUG_LED0 F5
-#define DEBUG_LED1 F6
-#define DEBUG_LED2 F7
-
 // Define simple macro's to use them (define __USE_DEBUG_LEDS__ before including file)
-#if defined(__USE_DEBUG_LEDS__)
+#if defined(__USE_DEBUG_LEDS_)
+
+#define DEBUG_LED0                  DEBUG_LED0_V3
+#define DEBUG_LED1                  DEBUG_LED1_V3
+#define DEBUG_LED2                  DEBUG_LED2_V3
+
+#define INITIALIZE_DEBUG_LEDS do { SET_OUTPUT(DEBUG_LED0); SET_OUTPUT(DEBUG_LED1); SET_OUTPUT(DEBUG_LED2); } while(0)
+#define SWITCH_ON_DEBUG_LED(led) do { WRITE(led, HIGH); } while(0)
+#define SWITCH_OFF_DEBUG_LED(led) do { WRITE(led, LOW); } while(0)
+
+#elif defined(__USE_DEBUG_LEDS_BOARD_V4__)
+
+#define DEBUG_LED0                  DEBUG_LED0_V4
+#define DEBUG_LED1                  DEBUG_LED1_V4
+#define DEBUG_LED2                  DEBUG_LED2_V4
 
 #define INITIALIZE_DEBUG_LEDS do { SET_OUTPUT(DEBUG_LED0); SET_OUTPUT(DEBUG_LED1); SET_OUTPUT(DEBUG_LED2); } while(0)
 #define SWITCH_ON_DEBUG_LED(led) do { WRITE(led, HIGH); } while(0)

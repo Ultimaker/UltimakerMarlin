@@ -64,19 +64,19 @@ const uint8_t   A1335_COMMAND_TIMEOUT = 10; // Commands shouldn't take more mill
 typedef union {
   struct {
     uint16_t ZeroOffset;    // 0 - 15: Zero Offset Angle
-    int FI: 1;              // 16 Filter Enable
-    int unused3: 1;         // 17 -
-    int LR: 1;              // 18 Pre-Linearization Rotation Direction
-    int HL: 1;              // 19 Harmonic Linearization
-    int SL: 1;              // 20 Segmented Linearization
-    int RO: 1;              // 21 Rotation Direction
-    int IV: 1;              // 22 Invert Angle
-    int unused2: 1;         // 23 -
-    int SS: 1;              // 24 Short Stroke Mode
-    int SB: 1;              // 25 Segmented Linearization Bypass
-    int LS: 1;              // 26 Segmented Linearization Select
-    int RD: 1;              // 27 Rotate Die
-    int unused: 4;          // 28-31 -
+    int16_t FI: 1;              // 16 Filter Enable
+    int16_t unused3: 1;         // 17 -
+    int16_t LR: 1;              // 18 Pre-Linearization Rotation Direction
+    int16_t HL: 1;              // 19 Harmonic Linearization
+    int16_t SL: 1;              // 20 Segmented Linearization
+    int16_t RO: 1;              // 21 Rotation Direction
+    int16_t IV: 1;              // 22 Invert Angle
+    int16_t unused2: 1;         // 23 -
+    int16_t SS: 1;              // 24 Short Stroke Mode
+    int16_t SB: 1;              // 25 Segmented Linearization Bypass
+    int16_t LS: 1;              // 26 Segmented Linearization Select
+    int16_t RD: 1;              // 27 Rotate Die
+    int16_t unused: 4;          // 28-31 -
   } reg;
 
   uint32_t all;
@@ -216,7 +216,7 @@ uint16_t FlowA1335::getAngleWait()
     }
 
     // Ensure we are not corrupting another ongoing transfer.
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     while(isBusy())
     { // Wait
 
@@ -286,7 +286,7 @@ bool FlowA1335::resetDevice()
     writeRegisterBlocking(A1335_CTRL, 0x20B9);
 
     // Wait for the reset to finish.
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     uint16_t read_flags;
     do
     {
@@ -382,7 +382,7 @@ bool FlowA1335::setRunMode(bool set_running)
     if (!set_running)
     {
         // Wait for A1335 to enter idle mode (can take up to 125us)
-        unsigned long start_time = millis();
+    	uint32_t start_time = millis();
         while(isInRunMode())
         {
             // wait
@@ -423,7 +423,7 @@ bool FlowA1335::extendedWrite(uint16_t address, uint32_t data)
     i2cDriverExecuteAndWait(&i2c_set_command);
 
     // Wait for the write to complete.
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     uint16_t write_flags;
     do
     {
@@ -457,7 +457,7 @@ bool FlowA1335::extendedRead(uint16_t address, uint32_t &data)
     i2cDriverExecuteAndWait(&i2c_set_command);
 
     // Wait for the read to complete.
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     uint16_t read_flags;
     do
     {

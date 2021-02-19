@@ -22,7 +22,7 @@
 #include "flow_A1335.h"
 
 
-extern FlowA1335 flowSensor[];
+extern FlowA1335 *flowSensor[];
 
 struct FlowBucket
 {
@@ -32,10 +32,25 @@ struct FlowBucket
     int16_t     e_position_change;  // The E position change [steps]
 };
 
+enum FlowSensorVersion
+{
+    FLOW_SENSOR_NONE,
+    FLOW_SENSOR_VERSION_1,
+    FLOW_SENSOR_VERSION_2
+};
+
+struct FlowSensorSettings
+{
+    float       minimum_extrusion_factor;      // The lower extrusion factor limit before triggering EOF
+    float       maximum_extrusion_factor;      // The upper extrusion factor limit before triggering EOF
+};
+
 #define FILAMENT_DIAMETER                   2.85
 #define FILAMENT_RADIUS                     (FILAMENT_DIAMETER / 2)
 #define MM3_IN_1MM_OF_FILAMENT              (M_PI * FILAMENT_RADIUS * FILAMENT_RADIUS)
 #define MM_OF_FILAMENT_FOR_1MM3             (1 / MM3_IN_1MM_OF_FILAMENT)
+// This is a define and not a static class variable because a non integer type can't be a const in one compiler and it can't be a constexpr in the other compiler...
+#define SENSOR_WHEEL_DIAMETER 9.0
 
 #define SAMPLE_INTERVAL_MM                  0.2 // Number of mm extruder movement before we take a new sample [mm]
 #define FLOW_BUCKET_SIZE_MM                 1.0 // Size of a flow bucket [mm]
@@ -58,6 +73,11 @@ public:
     // @brief   Configures the number of feeder steps required to move the filament 1mm.
     // @param   stepsPerMm is the number of steps to move the filament 1mm [float].
     virtual void setStepsPerMm(float stepsPerMm);
+
+    // @brief Sets the minimal extrusion as a factor of the desired extrusion
+    // @param sensor_index The index of the sensor to set the factor for.
+    // @param factor Factor to use.
+    virtual void setMinimumExtrusionFactor(uint8_t sensor_index, float factor);
 
     // @brief   Set output rate (averaging) for all flow sensors.
     // @param   output_rate configures the refresh rate of the angle data, i.e. how many samples are averaged before output.
@@ -94,7 +114,7 @@ public:
     // @brief   Update the position tracking and flow sensor data.
     //          This function should be called at frequent intervals during printing (the more often is better for higher accuracy).
     //          In order to reduce system load this function will only do something when more than 1mm3 has been extruded.
-    virtual void update();
+    virtual uint8_t update();
 
     // @brief   Update extrusion flow position for active extruder. Calling this function impacts
     //          the flow detection algorithm, to prevent the algorithm from working with old data
@@ -106,6 +126,10 @@ public:
     // @brief   Update extrusion flow position for active extruder.
     //          Retrieves active feeder position and sensor position (blocking call, so not optimal)
     virtual void updateExtrusionPosition();
+
+    static const int16_t SENSOR_RESOLUTION = 4096;    // The sensor's angle resolution. Where 4096 steps are one full revolution.
+    const float SENSOR_WHEEL_CIRCUM;
+    static const uint16_t NO_SENSOR_DATA = UINT16_MAX;
 
 private:
     int16_t    bucket_size_e_steps;         // minimum size of a bucket in extruder steps
@@ -119,8 +143,7 @@ private:
         int16_t  e_steps_total;
         float    flow_sensor_distance;
         float    stepper_distance;
-        float    distance_difference;
-        float    maximum_allowed_difference;
+        float    extrusion_factor;
     };
 
     // State machine states
@@ -131,14 +154,20 @@ private:
     };
 
     struct FlowBucket   flow_buckets[NR_OF_FLOW_SENSORS][NR_OF_FLOW_BUCKETS];   // These buckets track data from angle position in relation to flow sensor angle over time.
+    struct FlowSensorSettings sensor_settings[NR_OF_FLOW_SENSORS];
 
     uint8_t     window_pointer[NR_OF_FLOW_SENSORS];         // The buckets are organized in a ring buffer. This window pointer indicates the current active bucket.
     int32_t     previous_e_position_in_steps;               // The e_position at the end of the previous bucket (== the start of this bucket). Tracked as a global i.s.o. per extruder since Marlin only tracks one E position.
     int32_t     current_e_position_in_steps;                // The e_position value that is matched to a flow sensor value
-    float       allowed_flow_error_factor;                  // The allowed deviation factor in extruded volume.
     bool        is_e_pos_reset;                             // Used in flow data logging. Tracking the logged data makes more sense when there is an indication for the Gcode resetting the extrusion position.
 
+    FlowSensorVersion sensor_version; // The version of the flow sensors.
     SamplingState current_state; // The current state of the internal state machine
+
+    // @brief   Detect the indicated flow sensor and identify the version.
+    // @param   sensor_nr is the sensor index [0-1].
+    // @return  Returns Enum indicating the sensor version or undetected.
+    FlowSensorVersion detectFlowSensor(uint8_t sensor_nr);
 
     // @brief   Reset the internal state machine, this is important because the update function has a locally scoped
     //          variable tracking the e-stepper position. This value could be invalid before it is used when the extrusion
@@ -167,7 +196,7 @@ private:
     // @brief   Returns true when there is a flow error.
     // @param   flowData is a structure with consolidated flow data values.
     // @return  True when there is a flow error.
-    bool hasFlowError(const CalculatedFlowData& flowData);
+    bool hasFlowError(uint8_t sensor_nr, const CalculatedFlowData& flowData);
 
     // @brief   Dump a lot of debugging data
     void debugDump();

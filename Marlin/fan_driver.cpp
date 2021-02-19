@@ -32,18 +32,18 @@ void initFans()
 {
     //For the UM2 the head fan is connected to PJ6, which does not have an Arduino PIN definition. So use direct register access.
     SET_OUTPUT(UM2_HOTEND_FAN_PIN);
+    setHotendCoolingFanSpeed(0);
 
     if (Board::hasCaseFans())
     {
-        // For some unknown reason analogWrite to this pin is not working. Using digital instead to turn either on or off
-        SET_OUTPUT(CASE_FAN_24V_PIN);
-        WRITE(CASE_FAN_24V_PIN, LOW);
-
+        pinMode(CASE_FAN_24V_PIN, OUTPUT);
         setCaseFanSpeed(0);
     }
 
 #if (MATERIAL_COOLING_FAN_PIN > -1)
-    SET_OUTPUT(MATERIAL_COOLING_FAN_PIN);
+    pinMode(MATERIAL_COOLING_FAN_PIN, OUTPUT);
+    setMaterialCoolingFanSpeed(0);
+
     #ifdef FAST_PWM_FAN
         setPwmFrequency(MATERIAL_COOLING_FAN_PIN, 1); // No prescaling. Pwm frequency = F_CPU/256/8
     #endif
@@ -57,31 +57,11 @@ void setCaseFanSpeed(uint8_t fan_speed)
         return;
     }
 
-    switch (fan_speed)
-    {
-        case 0:
-        {
-            WRITE(CASE_FAN_24V_PIN, LOW);
-            SERIAL_ECHO_START;
-            SERIAL_ECHOLNPGM("Case fan 24V OFF");
-            break;
-        }
-        case 255:
-        {
-            WRITE(CASE_FAN_24V_PIN, HIGH);
-            SERIAL_ECHO_START;
-            SERIAL_ECHOLNPGM("Case fan 24V ON");
-            break;
-        }
-        default:
-        {
-            SERIAL_ECHO_START;
-            SERIAL_ECHOPGM("Case fan 24V, fan_speed = ");
-            MSerial.print(fan_speed, DEC);
-            SERIAL_ECHOLNPGM(" (pwm) is not supported!");
-            break;
-        }
-    }
+    analogWrite(CASE_FAN_24V_PIN, fan_speed);
+    SERIAL_ECHO_START;
+    SERIAL_ECHOPGM("Case fan 24V, speed = ");
+    MSerial.print(fan_speed, DEC);
+    SERIAL_ECHOLN("");
 }
 
 /** @brief Sets the fan speed
@@ -100,7 +80,7 @@ static void setFanSpeed(uint8_t fan_location, uint8_t fan_speed)
     setPCA9635output(fan_location, 255 - fan_speed);
 }
 
-void setCoolingFanSpeed(uint8_t fan_speed)
+void setMaterialCoolingFanSpeed(uint8_t fan_speed)
 {
     setFanSpeed(FAN_LEFT, fan_speed);
     setFanSpeed(FAN_RIGHT, fan_speed);
@@ -110,7 +90,7 @@ void setCoolingFanSpeed(uint8_t fan_speed)
     current_fan_speed = fan_speed;
 }
 
-uint8_t getCoolingFanSpeed()
+uint8_t getMaterialCoolingFanSpeed()
 {
     return current_fan_speed;
 }

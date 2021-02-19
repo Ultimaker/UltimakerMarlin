@@ -1,5 +1,4 @@
 #include <getopt.h>
-#include <Arduino.h>
 
 #include <avr/io.h>
 
@@ -22,6 +21,8 @@
 #endif//!USE_SDL
 
 #include "../Marlin/stepper.h"
+// The following include must be after the other includes because it sets a few defines that mask glibC functions such as min() and max()
+#include <Arduino.h>
 
 
 #define PRINTER_DOWN_SCALE 2

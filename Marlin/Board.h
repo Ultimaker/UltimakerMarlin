@@ -34,7 +34,8 @@ public:
         BOARD_V2_0,     // Ultimaker 2 board or one of the initial prototype board for the Ultimaker 3. Not used in the field. Has 8 microsteps on the Z axis.
         BOARD_V2_X,     // Initial production board for the Ultimaker 3. Has 16 microsteps on the Z.
         BOARD_REV_I,    // Update of the Ultimaker 3 board. Removes all unused components. This requires slightly different safety circuit handling.
-        BOARD_2621B,    // Ultimaker 3.1/XL board, rev. B (2621 == 1000897; numbering scheme has changed)
+        BOARD_2621B,    // Ultimaker 3.1/S5 board, rev. B (2621 == 1000897; numbering scheme has changed)
+        BOARD_V4,       // Ultimaker S5r2/S3 board, Ultimainboard 4.2 with SMARC SOM
         MAX_BOARD_ID
     } BoardType;
 
@@ -57,11 +58,11 @@ public:
         return board_id;
     }
 
-    /** @brief Power down the board.
-     */
-    static void powerDown();
+    /** @brief Disable all stepper motors and then switch of the 24V power supply
+    */
+    static void powerDownSafely();
 
-    /** @brief Power up the board
+    /** @brief Enable the 24V Power supply.
      */
     static void powerUp();
 
@@ -97,6 +98,12 @@ private:
      *  @return 0 if init finished without complications.
      */
     static uint8_t initBoard2621B();
+
+    /** @brief Disable the 24V power supply.
+     */
+    static void powerDown();
 };
 
-#endif//BOARD_H
+#endif  //BOARD_H
+
+

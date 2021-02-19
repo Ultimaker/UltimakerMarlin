@@ -17,6 +17,8 @@ typedef char prog_char;
 #define strncmp_P strncmp
 #define strncpy_P strncpy
 #define strchr_P strchr
+#define printf_P printf
+#define sprint_P sprintf
 
 static inline uint8_t pgm_read_byte(const void* ptr)
 {

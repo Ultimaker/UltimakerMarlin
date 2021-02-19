@@ -170,19 +170,19 @@ void i2cDriverPlan(i2cCommand* command)
 void i2cDriverExecuteAndWait(i2cCommand* command)
 {
     i2cDriverPlan(command);
-    unsigned long start_time = millis();
+    uint32_t start_time = millis();
     while(!command->finished)
     {
         if (millis() - start_time > 100)
         {
             SERIAL_ECHOPGM("LOG:I2C_COMM_ERROR:");
-            SERIAL_ECHO(int(command->slave_address_rw));
+            SERIAL_ECHO(int16_t(command->slave_address_rw));
             SERIAL_ECHO(':');
-            SERIAL_ECHO(int(command->buffer_size));
+            SERIAL_ECHO(int16_t(command->buffer_size));
             for(uint8_t n=0; n<command->buffer_size; n++)
             {
                 SERIAL_ECHO(':');
-                SERIAL_ECHO(int(command->buffer[n]));
+                SERIAL_ECHO(int16_t(command->buffer[n]));
             }
             SERIAL_ECHO('\n');
             stop(STOP_REASON_I2C_COMM_ERROR);

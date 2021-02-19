@@ -1,6 +1,7 @@
-#include <Arduino.h>
-
 #include "arduinoIO.h"
+
+// The following include must be after the other includes because it sets a few defines that mask glibC functions such as min() and max()
+#include <Arduino.h>
 
 #define PA 1
 #define PB 2

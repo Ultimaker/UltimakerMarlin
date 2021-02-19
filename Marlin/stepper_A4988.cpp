@@ -17,7 +17,7 @@
 #include "Marlin.h"
 #include "stepper_A4988.h"
 
-int StepperA4988::motor_current_setting[3] = DEFAULT_PWM_MOTOR_CURRENT;
+int16_t StepperA4988::motor_current_setting[3] = DEFAULT_PWM_MOTOR_CURRENT;
 
 /** @brief Initializes the output pins and set the outut current to the default
  */
@@ -43,9 +43,9 @@ void StepperA4988::init() //Initialize Digipot Motor Current
     TCCR5B = (TCCR5B & ~(_BV(CS50) | _BV(CS51) | _BV(CS52))) | _BV(CS50);
 }
 
-void StepperA4988::setCurrent(uint8_t driver, int current)
+void StepperA4988::setCurrent(uint8_t driver, int16_t current)
 {
-  long analog_value = (long)current * 255L / (long)MOTOR_CURRENT_PWM_RANGE;
+  int32_t analog_value = (int32_t)current * 255L / (int32_t)MOTOR_CURRENT_PWM_RANGE;
   #if MOTOR_CURRENT_PWM_XY_PIN > -1
     if (driver == 0) analogWrite(MOTOR_CURRENT_PWM_XY_PIN, analog_value);
   #endif
