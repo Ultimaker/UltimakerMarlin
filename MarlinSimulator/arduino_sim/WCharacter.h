@@ -1,6 +1,6 @@
 /*
  WCharacter.h - Character utility functions for Wiring & Arduino
- Copyright (c) 2010 Hernando Barragan.  All right reserved.
+ Copyright (c) 2010 Hernando Barragan.  All rights reserved.
  
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public

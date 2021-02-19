@@ -1,7 +1,7 @@
 /*
   WString.h - String library for Wiring & Arduino
   ...mostly rewritten by Paul Stoffregen...
-  Copyright (c) 2009-10 Hernando Barragan.  All right reserved.
+  Copyright (c) 2009-10 Hernando Barragan.  All rights reserved.
   Copyright 2011, Paul Stoffregen, paul@pjrc.com
 
   This library is free software; you can redistribute it and/or

@@ -1,6 +1,6 @@
 /*
   HardwareSerial.cpp - Hardware serial library for Wiring
-  Copyright (c) 2006 Nicholas Zambetti.  All right reserved.
+  Copyright (c) 2006 Nicholas Zambetti.  All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public

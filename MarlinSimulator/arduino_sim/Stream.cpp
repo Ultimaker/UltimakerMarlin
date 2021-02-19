@@ -1,6 +1,6 @@
 /*
  Stream.cpp - adds parsing methods to Stream class
- Copyright (c) 2008 David A. Mellis.  All right reserved.
+ Copyright (c) 2008 David A. Mellis.  All rights reserved.
 
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public

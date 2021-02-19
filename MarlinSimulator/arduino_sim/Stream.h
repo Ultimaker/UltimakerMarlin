@@ -1,6 +1,6 @@
 /*
   Stream.h - base class for character-based streams.
-  Copyright (c) 2010 David A. Mellis.  All right reserved.
+  Copyright (c) 2010 David A. Mellis.  All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
