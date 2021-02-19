@@ -14,19 +14,19 @@
 #define PK 11
 #define PL 12
 
-arduinoIOSim::arduinoIOSim()
+ArduinoIOSim::ArduinoIOSim()
 {
-    PORTA.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTA_callback));
-    PORTB.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTB_callback));
-    PORTC.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTC_callback));
-    PORTD.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTD_callback));
-    PORTE.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTE_callback));
-    PORTF.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTF_callback));
-    PORTG.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTG_callback));
-    PORTH.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTH_callback));
-    PORTJ.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTJ_callback));
-    PORTK.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTK_callback));
-    PORTL.setCallback(DELEGATE(registerDelegate, arduinoIOSim, *this, IO_PORTL_callback));
+    PORTA.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTA_callback));
+    PORTB.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTB_callback));
+    PORTC.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTC_callback));
+    PORTD.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTD_callback));
+    PORTE.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTE_callback));
+    PORTF.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTF_callback));
+    PORTG.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTG_callback));
+    PORTH.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTH_callback));
+    PORTJ.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTJ_callback));
+    PORTK.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTK_callback));
+    PORTL.setCallback(DELEGATE(registerDelegate, ArduinoIOSim, *this, IO_PORTL_callback));
     
     for(unsigned int n=0; n<11*8; n++)
         portIdxToPinNr[n] = -1;
@@ -41,18 +41,18 @@ arduinoIOSim::arduinoIOSim()
         portIdxToPinNr[idx] = n;
     }
 }
-arduinoIOSim::~arduinoIOSim()
+ArduinoIOSim::~ArduinoIOSim()
 {
 }
 
-void arduinoIOSim::registerPortCallback(int portNr, ioDelegate func)
+void ArduinoIOSim::registerPortCallback(int portNr, ioDelegate func)
 {
     if (portNr < 0 || portNr >= NUM_DIGITAL_PINS)
         return;
     ioWriteDelegate[portNr] = func;
 }
 
-void arduinoIOSim::checkPinChange(int portID, uint8_t oldValue, uint8_t newValue)
+void ArduinoIOSim::checkPinChange(int portID, uint8_t oldValue, uint8_t newValue)
 {
     uint8_t change = oldValue ^ newValue;
     if (change)
@@ -69,47 +69,47 @@ void arduinoIOSim::checkPinChange(int portID, uint8_t oldValue, uint8_t newValue
     }
 }
 
-void arduinoIOSim::IO_PORTA_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTA_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PA, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTB_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTB_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PB, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTC_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTC_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PC, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTD_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTD_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PD, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTE_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTE_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PE, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTF_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTF_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PF, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTG_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTG_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PG, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTH_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTH_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PH, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTJ_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTJ_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PJ, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTK_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTK_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PK, oldValue, newValue);
 }
-void arduinoIOSim::IO_PORTL_callback(uint8_t oldValue, uint8_t& newValue)
+void ArduinoIOSim::IO_PORTL_callback(uint8_t oldValue, uint8_t& newValue)
 {
     checkPinChange(PL, oldValue, newValue);
 }
@@ -124,6 +124,151 @@ bool readOutput(int arduinoPinNr)
 	AVRRegistor* out = portOutputRegister(port);
 
     return (*out) & bit;
+}
+
+uint8_t readAnalogOutput(int arduinoPinNr)
+{
+    switch(digitalPinToTimer(arduinoPinNr))
+    {
+    #if defined(TCCR0) && defined(COM00) && !defined(__AVR_ATmega8__)
+    case TIMER0A:
+        if (TCCR0 & _BV(COM00))
+            return OCR0;
+        break;
+    #endif
+
+    #if defined(TCCR0A) && defined(COM0A1)
+    case TIMER0A:
+        if (TCCR0A & _BV(COM0A1))
+            return OCR0A;
+        break;
+    #endif
+
+    #if defined(TCCR0A) && defined(COM0B1)
+    case TIMER0B:
+        if (TCCR0A & _BV(COM0B1))
+            return OCR0B;
+        break;
+    #endif
+
+    #if defined(TCCR1A) && defined(COM1A1)
+    case TIMER1A:
+        if (TCCR1A & _BV(COM1A1))
+            return OCR1A;
+        break;
+    #endif
+
+    #if defined(TCCR1A) && defined(COM1B1)
+    case TIMER1B:
+        if (TCCR1A & _BV(COM1B1))
+            return OCR1B;
+        break;
+    #endif
+
+    #if defined(TCCR2) && defined(COM21)
+    case TIMER2:
+        if (TCCR2 & _BV(COM21))
+            return OCR2;
+        break;
+    #endif
+
+    #if defined(TCCR2A) && defined(COM2A1)
+    case TIMER2A:
+        if (TCCR2A & _BV(COM2A1))
+            return OCR2A;
+        break;
+    #endif
+
+    #if defined(TCCR2A) && defined(COM2B1)
+    case TIMER2B:
+        if (TCCR2A & _BV(COM2B1))
+            return OCR2B;
+        break;
+    #endif
+
+    #if defined(TCCR3A) && defined(COM3A1)
+    case TIMER3A:
+        if (TCCR3A & _BV(COM3A1))
+            return OCR3A;
+        break;
+    #endif
+
+    #if defined(TCCR3A) && defined(COM3B1)
+    case TIMER3B:
+        if (TCCR3A & _BV(COM3B1))
+            return OCR3B;
+        break;
+    #endif
+
+    #if defined(TCCR3A) && defined(COM3C1)
+    case TIMER3C:
+        if (TCCR3A & _BV(COM3C1))
+            return OCR3C;
+        break;
+    #endif
+
+    #if defined(TCCR4A)
+    case TIMER4A:
+        if (TCCR4A & _BV(COM4A1))
+        {
+            #if defined(COM4A0)		// only used on 32U4
+            if (!(TCCR4A & _BV(COM4A0)))
+            #endif
+            return OCR4A;
+        }
+        break;
+    #endif
+    
+    #if defined(TCCR4A) && defined(COM4B1)
+    case TIMER4B:
+        if (TCCR4A & _BV(COM4B1))
+            return OCR4B;
+        break;
+    #endif
+
+    #if defined(TCCR4A) && defined(COM4C1)
+    case TIMER4C:
+        if (TCCR4A & _BV(COM4C1))
+            return OCR4C;
+        break;
+    #endif
+        
+    #if defined(TCCR4C) && defined(COM4D1)
+    case TIMER4D:				
+        // connect pwm to pin on timer 4, channel D
+        if (TCCR4C & _BV(COM4D1))
+        {
+            #if defined(COM4D0)		// only used on 32U4
+            if (!(TCCR4C & _BV(COM4D0))
+            #endif
+            return OCR4D;
+        }
+        break;
+    #endif
+
+                    
+    #if defined(TCCR5A) && defined(COM5A1)
+    case TIMER5A:
+        if (TCCR5A & _BV(COM5A1))
+            return OCR5A;
+        break;
+    #endif
+
+    #if defined(TCCR5A) && defined(COM5B1)
+    case TIMER5B:
+        if (TCCR5A & _BV(COM5B1))
+            return OCR5B;
+        break;
+    #endif
+
+    #if defined(TCCR5A) && defined(COM5C1)
+    case TIMER5C:
+        if (TCCR5A & _BV(COM5C1))
+            return OCR5C;
+        break;
+    #endif
+    }
+    return readOutput(arduinoPinNr) ? 255 : 0;
 }
 
 void writeInput(int arduinoPinNr, bool value)

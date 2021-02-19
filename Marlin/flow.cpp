@@ -20,25 +20,19 @@
 #define SENSOR_WHEEL_DIAMETER               9       // Diameter in mm.
 #define SENSOR_RESOLUTION                   4096    // The sensor's angle resolution. Where 4096 steps are one full revolution.
 #define SENSOR_WHEEL_CIRCUM                 (SENSOR_WHEEL_DIAMETER * M_PI)
+#define DEFAULT_ALLOWED_FLOW_ERROR_FACTOR   0.8     // The default allowed error in extruded volume
+
 #define NO_SENSOR_DATA                      (UINT16_MAX)
 
 FlowA1335 flowSensor[MAX_A1335_SENSOR_COUNT] = {0, 1, 2, 3};
 
-static FlowSensorSettings defaultFlowsensorSettings = {
-        .minimum_extrusion_factor = 0.2,
-        .maximum_extrusion_factor = 1.2
-};
-
 Flow::Flow()
   : previous_e_position_in_steps(0)
   , current_e_position_in_steps(0)
+  , allowed_flow_error_factor(DEFAULT_ALLOWED_FLOW_ERROR_FACTOR)
   , is_e_pos_reset(false)
   , current_state( STAGE_TRIGGER_NEW_SAMPLING )
 {
-    for (uint8_t sensor=0; sensor < NR_OF_FLOW_SENSORS; sensor++)
-    {
-        sensor_settings[sensor] = defaultFlowsensorSettings;
-    }
 }
 
 void Flow::init()
@@ -115,11 +109,6 @@ void Flow::initFlowBucket(FlowBucket* bucket_ptr)
     bucket_ptr->last_e_position = st_get_position(E_AXIS);
     bucket_ptr->angle_change = 0;
     bucket_ptr->e_position_change = 0;
-}
-
-void Flow::setMinimumExtrusionFactor(uint8_t sensor_index, float factor)
-{
-    sensor_settings[sensor_index].minimum_extrusion_factor = factor;
 }
 
 void Flow::setStepsPerMm(float stepsPerMm)
@@ -231,6 +220,25 @@ void Flow::updateExtrusionPosition(uint8_t sensor_nr, uint16_t current_angle_raw
     FlowBucket* flow_bucket = getCurrentBucketPointer(sensor_nr);
     int16_t previous_angle = flow_bucket->last_sensor_angle;
     int16_t actual_moved_steps = current_e_pos - previous_e_position_in_steps;
+    bool has_flow_error = false;
+
+    // Have we reached the trigger level to start a new bucket?
+    if (flow_bucket->e_position_change >= bucket_size_e_steps)
+    {
+        flow_bucket = getNewBucket(sensor_nr);
+
+        // Flow problems are not checked for the current bucket because it might contain a retract.
+        // So, we only have to verify flow problems when a new bucket is created.
+        CalculatedFlowData flowData = calculateFlowData(sensor_nr);
+        has_flow_error = hasFlowError(flowData);
+        if (has_flow_error)
+        {
+            sendFlowError(sensor_nr, flowData);
+
+            // Reset the error counters.
+            initFlowBuckets(sensor_nr);
+        }
+    }
 
     // Add new data to the current bucket.
     flow_bucket->last_sensor_angle = current_angle_raw;
@@ -240,38 +248,7 @@ void Flow::updateExtrusionPosition(uint8_t sensor_nr, uint16_t current_angle_raw
 
     previous_e_position_in_steps = current_e_pos;
 
-    bool has_flow_error = false;
-    bool do_get_next_bucket = false;
-
-    // Have we reached the trigger level to start a new bucket?
-    if (flow_bucket->e_position_change >= bucket_size_e_steps)
-    {
-        do_get_next_bucket = true;
-
-        // Flow problems are not checked for the current bucket because it might contain a retract.
-        // So, we only have to verify flow problems when a new bucket is created.
-        CalculatedFlowData flowData = calculateFlowData(sensor_nr);
-        has_flow_error = hasFlowError(sensor_nr, flowData);
-        if (has_flow_error)
-        {
-            sendFlowError(sensor_nr, flowData);
-        }
-    }
-
     log(has_flow_error);
-
-    if(do_get_next_bucket)
-    {
-        FlowBucket* next_bucket = getNewBucket(sensor_nr);
-        next_bucket->last_e_position = current_e_pos;
-        next_bucket->last_sensor_angle = current_angle_raw;
-    }
-
-    if(has_flow_error)
-    {
-        initFlowBuckets(sensor_nr);
-    }
-
 }
 
 int16_t Flow::calculateAngleChange(uint16_t previous_angle, uint16_t current_angle)
@@ -295,29 +272,25 @@ void Flow::sendFlowError(uint8_t sensor_nr, CalculatedFlowData flowData)
 {
     SERIAL_ECHOPGM("WARNING:FILAMENT_FLOW:");
     SERIAL_ECHO(uint16_t(sensor_nr));
-    SERIAL_ECHOPGM(":");
+    SERIAL_ECHO(":");
     debugDump();
-    SERIAL_ECHOPGM(" : Total flow angle: ");
+    SERIAL_ECHO(" : Total flow angle: ");
     SERIAL_ECHO(flowData.raw_angle_total);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Total steps: ");
+    SERIAL_ECHO(", ");
+    SERIAL_ECHO("Total steps: ");
     SERIAL_ECHO(flowData.e_steps_total);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Flow sensor distance: ");
+    SERIAL_ECHO(", ");
+    SERIAL_ECHO("Flow sensor distance: ");
     SERIAL_ECHO(flowData.flow_sensor_distance);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Stepper distance: ");
+    SERIAL_ECHO(", ");
+    SERIAL_ECHO("Stepper distance: ");
     SERIAL_ECHO(flowData.stepper_distance);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Extrusion factor: ");
-    SERIAL_ECHO(flowData.extrusion_factor);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Minimum extrusion factor: ");
-    SERIAL_ECHO(sensor_settings[sensor_nr].minimum_extrusion_factor);
-    SERIAL_ECHOPGM(", ");
-    SERIAL_ECHOPGM("Maximum extrusion factor: ");
-    SERIAL_ECHO(sensor_settings[sensor_nr].maximum_extrusion_factor);
-
+    SERIAL_ECHO(", ");
+    SERIAL_ECHO("Distance difference: ");
+    SERIAL_ECHO(flowData.distance_difference);
+    SERIAL_ECHO(", ");
+    SERIAL_ECHO("Max allowed difference: ");
+    SERIAL_ECHO(flowData.maximum_allowed_difference);
     MSerial.println();
 }
 
@@ -349,16 +322,13 @@ Flow::CalculatedFlowData Flow::calculateFlowData(uint8_t sensor_nr)
     // Note: could have used scaled integers here instead of float but speed isn't critical and this is easier reading.
     flowData.flow_sensor_distance = float(flowData.raw_angle_total * SENSOR_WHEEL_CIRCUM) / SENSOR_RESOLUTION;
     flowData.stepper_distance = flowData.e_steps_total / axis_steps_per_unit[E_AXIS];
-    if(flowData.stepper_distance != 0) {
-        flowData.extrusion_factor = flowData.flow_sensor_distance / flowData.stepper_distance;
-    } else {
-        flowData.extrusion_factor = 0;
-    }
+    flowData.distance_difference = flowData.stepper_distance - flowData.flow_sensor_distance;
+    flowData.maximum_allowed_difference = fabs(flowData.stepper_distance * allowed_flow_error_factor);
 
     return flowData;
 }
 
-bool Flow::hasFlowError(uint8_t sensor_nr, const CalculatedFlowData& flowData)
+bool Flow::hasFlowError(const CalculatedFlowData& flowData)
 {
     // Quit when the minimum detection distance hasn't been reached yet
     if (flowData.e_steps_total < flow_error_minimum_e_steps)
@@ -366,8 +336,8 @@ bool Flow::hasFlowError(uint8_t sensor_nr, const CalculatedFlowData& flowData)
         return false;
     }
 
-    if (flowData.extrusion_factor < sensor_settings[sensor_nr].minimum_extrusion_factor
-            || flowData.extrusion_factor > sensor_settings[sensor_nr].maximum_extrusion_factor)
+    // We only check under extrusion, over extrusion is ignored.
+    if (flowData.distance_difference > flowData.maximum_allowed_difference )
     {
         return true;
     }

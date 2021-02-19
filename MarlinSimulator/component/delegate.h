@@ -3,19 +3,22 @@
 
 #include <stddef.h>
 /* Here be dragons... */
+/* TODO: EM-2762 [New] - This can pretty much be replaced with std::function<> 
+   as this is a less functional, less flexible form of std::function
+*/
 
 template<typename A0=void, typename A1=void>
-class delegate
+class Delegate
 {
 public:
-    delegate() : object_ptr(NULL), stub_ptr(NULL)
+    Delegate() : object_ptr(NULL), stub_ptr(NULL)
     {
     }
 
     template <class T, void (T::*TMethod)(A0 a0, A1 a1)>
-    static delegate from_method(T* object_ptr)
+    static Delegate from_method(T* object_ptr)
     {
-        delegate d;
+        Delegate d;
         d.object_ptr = object_ptr;
         d.stub_ptr = &method_stub<T, TMethod>;
         return d;

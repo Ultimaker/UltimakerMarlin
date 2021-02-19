@@ -19,6 +19,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#include <stdio.h>
 #include "WString.h"
 
 
@@ -64,7 +65,7 @@ String::String(unsigned char value, unsigned char base)
 {
 	init();
 	char buf[9];
-	utoa(value, buf, base);
+    sprintf(buf, "%d", value);
 	*this = buf;
 }
 
@@ -72,7 +73,7 @@ String::String(int value, unsigned char base)
 {
 	init();
 	char buf[18];
-	itoa(value, buf, base);
+    sprintf(buf, "%d", value);
 	*this = buf;
 }
 
@@ -80,7 +81,7 @@ String::String(unsigned int value, unsigned char base)
 {
 	init();
 	char buf[17];
-	utoa(value, buf, base);
+    sprintf(buf, "%u", value);
 	*this = buf;
 }
 
@@ -88,7 +89,7 @@ String::String(long value, unsigned char base)
 {
 	init();
 	char buf[34];
-	ltoa(value, buf, base);
+    sprintf(buf, "%ld", value);
 	*this = buf;
 }
 
@@ -96,7 +97,7 @@ String::String(unsigned long value, unsigned char base)
 {
 	init();
 	char buf[33];
-	ultoa(value, buf, base);
+    sprintf(buf, "%lu", value);
 	*this = buf;
 }
 
@@ -251,35 +252,35 @@ unsigned char String::concat(char c)
 unsigned char String::concat(unsigned char num)
 {
 	char buf[4];
-	itoa(num, buf, 10);
+    sprintf(buf, "%d", num);
 	return concat(buf, strlen(buf));
 }
 
 unsigned char String::concat(int num)
 {
 	char buf[7];
-	itoa(num, buf, 10);
+    sprintf(buf, "%d", num);
 	return concat(buf, strlen(buf));
 }
 
 unsigned char String::concat(unsigned int num)
 {
 	char buf[6];
-	utoa(num, buf, 10);
+    sprintf(buf, "%u", num);
 	return concat(buf, strlen(buf));
 }
 
 unsigned char String::concat(long num)
 {
 	char buf[12];
-	ltoa(num, buf, 10);
+    sprintf(buf, "%ld", num);
 	return concat(buf, strlen(buf));
 }
 
 unsigned char String::concat(unsigned long num)
 {
 	char buf[11];
-	ultoa(num, buf, 10);
+    sprintf(buf, "%lu", num);
 	return concat(buf, strlen(buf));
 }
 

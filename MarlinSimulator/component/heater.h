@@ -4,21 +4,29 @@
 #include "base.h"
 #include "adc.h"
 
-class heaterSim : public simBaseComponent
+class HeaterSim : public SimBaseComponent
 {
 public:
-    heaterSim(int heaterPinNr, adcSim* adc, int temperatureADCNr, float heaterStrength = 1.0);
-    virtual ~heaterSim();
+    HeaterSim(int heaterPinNr, float heater_strength = 1.0);
+    virtual ~HeaterSim();
     
     virtual void tick();
     virtual void draw(int x, int y);
+    
+    void adcReadout(int max_value, int& output);
 private:
-    float temperature;
-    float heaterStrength;
+    static constexpr float temperature_increase_on_full_heat_per_second = 12.0 / 5.0; /* this was measured over 5 second interval */
+    static constexpr float temperature_decrease_on_no_heat_per_second = 4.0 / 5.0; /* this was measured over 5 second interval */
+    static constexpr float measuring_delay = 5.0f;
+
+    unsigned long last_tick_count;
+    float temperature_core;
+    float temperature_sensor;
+    float heater_strength;
+    float heater_output;
 
     int heaterPinNr;
-    adcSim* adc;
-    int temperatureADCNr;
+    AvrAdcSim* adc;
 };
 
 #endif//I2C_SIM_H

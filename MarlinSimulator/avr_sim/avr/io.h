@@ -11,11 +11,10 @@
 
 #include "../../component/delegate.h"
 
-typedef delegate<uint8_t, uint8_t&> registerDelegate;
+typedef Delegate<uint8_t, uint8_t&> registerDelegate;
 typedef void (*sim_ms_callback_t)();
 
-void sim_check_interrupts();
-void sim_setup(sim_ms_callback_t callback);
+void simUpdate();
 
 class AVRRegistor
 {
@@ -48,7 +47,7 @@ public:
     ~AVRRegistor16() {}
     
     AVRRegistor16& operator = (const uint32_t v) { __reg_map[index] = v & 0xFF; __reg_map[index+1] = (v >> 8) & 0xFF; return *this; }
-    operator uint16_t() const { return uint16_t(__reg_map[index]) | (uint16_t(__reg_map[index+1])<<8); /*TODO*/}
+    operator uint16_t() const { return uint16_t(__reg_map[index]) | (uint16_t(__reg_map[index+1])<<8); }
 };
 
 #define _SFR_MEM8(__n) (__reg_map[(__n)])
@@ -60,6 +59,9 @@ public:
 #define _BV(bit) (1 << (bit))
 
 #define bit_is_set(sfr, bit) (_SFR_BYTE(sfr) & _BV(bit))
+#define bit_is_clear(sfr, bit) (!(_SFR_BYTE(sfr) & _BV(bit)))
+#define loop_until_bit_is_set(sfr, bit) do { } while (bit_is_clear(sfr, bit))
+#define loop_until_bit_is_clear(sfr, bit) do { } while (bit_is_set(sfr, bit))
 
 #include "iom2560.h"
 

@@ -15,6 +15,10 @@
 extern "C"{
 #endif
 
+#ifndef M_PI
+#define M_PI 3.1415926535897932384626433832795
+#endif
+
 #define HIGH 0x1
 #define LOW  0x0
 

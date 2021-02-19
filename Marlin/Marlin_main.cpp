@@ -121,7 +121,6 @@ char compile_date_time[] __attribute__((section(".vectors"))) __attribute__((use
 // M405 - Enable/disable the flow sensor hardware. S1=active A=averaging value
 // M406 - Re-init flow sensor algorithm
 // M407 - Read raw flow sensor value: S<sensor number>
-// M408 S[sensor] P[flow error factor] - Set allowed_flow_error_factor for specific flow sensor
 // M907 - Set digital trimpot motor current using axis codes. Current in mA. X-axis sets Y-axis as well. (M907 X1300 Z1300 E1250)
 // M998 - Intentionally stop the system as if by an error.
 // M999 - Restart after being stopped by error
@@ -1413,28 +1412,13 @@ static void process_command()
             flow->initFlowData();
     }
     break;
-    case 407: // M407 - Read flow sensor raw value
+    case 407: //M407 - Read flow sensor raw value
     {
         if (code_seen('S'))
         {
             uint8_t nr = code_value();
             MSerial.println(flowSensor[nr].getAngleWait());
         }
-    }
-    break;
-    case 408: // M408 S[sensor] P[factor for allowed flow errors]- Set 'allowed_flow_error_factor' for specific flow sensor
-    {
-	if (code_seen('S'))
-	{
-        uint8_t sensor_index = code_value();
-        if(code_seen('P'))
-	    {
-            // Internally we work with relative flow (sensor/motor) and we have a lower and upper threshold to triggering EOF.
-            // Outside marlin the minimum extrusion is defined as the minimum sensor movement as portion of the motor movement
-            // Thus we have to recalculate with f = 1 - x
-            flow->setMinimumExtrusionFactor(sensor_index, 1.0f - code_value());
-	    }
-	}
     }
     break;
     case 907: // M907 - Set digital trimpot motor current using axis codes

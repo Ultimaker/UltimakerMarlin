@@ -1,7 +1,9 @@
 #include "stepper.h"
+#include "flux_AS5048B.h"
 #include "arduinoIO.h"
+#include "../frontend/frontend.h"
 
-stepperSim::stepperSim(arduinoIOSim* arduinoIO, int enablePinNr, int stepPinNr, int dirPinNr, bool invertDir)
+StepperSim::StepperSim(ArduinoIOSim* arduinoIO, int enablePinNr, int stepPinNr, int dirPinNr, bool invertDir)
 {
     this->minStepValue = -1;
     this->maxStepValue = -1;
@@ -14,13 +16,16 @@ stepperSim::stepperSim(arduinoIOSim* arduinoIO, int enablePinNr, int stepPinNr, 
     this->stepPin = stepPinNr;
     this->dirPin = dirPinNr;
     
-    arduinoIO->registerPortCallback(stepPinNr, DELEGATE(ioDelegate, stepperSim, *this, stepPinUpdate));
+    this->flow_sensor = nullptr;
+    this->flow_sensor_ratio = 0.0f;
+    
+    arduinoIO->registerPortCallback(stepPinNr, DELEGATE(ioDelegate, StepperSim, *this, stepPinUpdate));
 }
-stepperSim::~stepperSim()
+StepperSim::~StepperSim()
 {
 }
 
-void stepperSim::stepPinUpdate(int pinNr, bool high)
+void StepperSim::stepPinUpdate(int pinNr, bool high)
 {
     if (high)//Only step on high->low transition.
         return;
@@ -30,19 +35,25 @@ void stepperSim::stepPinUpdate(int pinNr, bool high)
         stepValue --;
     else
         stepValue ++;
-    if (minStepValue == -1)
-        return;
-    if (stepValue < minStepValue)
-        stepValue = minStepValue;
-    if (stepValue > maxStepValue)
-        stepValue = maxStepValue;
-    if (minEndstopPin > -1)
-        writeInput(minEndstopPin, stepValue != minStepValue);
-    if (maxEndstopPin > -1)
-        writeInput(maxEndstopPin, stepValue != maxStepValue);
+    if (minStepValue != -1)
+    {
+        if (stepValue < minStepValue)
+            stepValue = minStepValue;
+        if (minEndstopPin > -1)
+            writeInput(minEndstopPin, stepValue != minStepValue);
+    }
+    if (maxStepValue != -1)
+    {
+        if (stepValue > maxStepValue)
+            stepValue = maxStepValue;
+        if (maxEndstopPin > -1)
+            writeInput(maxEndstopPin, stepValue != maxStepValue);
+    }
+    if (flow_sensor)
+        flow_sensor->position = stepValue * flow_sensor_ratio;
 }
 
-void stepperSim::setEndstops(int minEndstopPinNr, int maxEndstopPinNr)
+void StepperSim::setEndstops(int minEndstopPinNr, int maxEndstopPinNr)
 {
     minEndstopPin = minEndstopPinNr;
     maxEndstopPin = maxEndstopPinNr;
@@ -51,9 +62,9 @@ void stepperSim::setEndstops(int minEndstopPinNr, int maxEndstopPinNr)
     writeInput(maxEndstopPin, stepValue != maxStepValue);
 }
 
-void stepperSim::draw(int x, int y)
+void StepperSim::draw(int x, int y)
 {
     char buffer[32];
     sprintf(buffer, "%i steps", int(stepValue));
-    drawString(x, y, buffer, 0xFFFFFF);
+    Frontend::instance->drawString(x, y, buffer, 0xFFFFFF);
 }

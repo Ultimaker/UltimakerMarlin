@@ -5,13 +5,13 @@
 #include "delegate.h"
 #include <Arduino.h>
 
-typedef delegate<int, bool> ioDelegate;
+typedef Delegate<int, bool> ioDelegate;
 
-class arduinoIOSim : public simBaseComponent
+class ArduinoIOSim : public SimBaseComponent
 {
 public:
-    arduinoIOSim();
-    virtual ~arduinoIOSim();
+    ArduinoIOSim();
+    virtual ~ArduinoIOSim();
     
     void registerPortCallback(int portNr, ioDelegate func);
 private:
@@ -34,6 +34,7 @@ private:
 };
 
 bool readOutput(int arduinoPinNr);
+uint8_t readAnalogOutput(int arduinoPinNr);
 void writeInput(int arduinoPinNr, bool value);
 
 #endif//ARDUINO_IO_SIM_H

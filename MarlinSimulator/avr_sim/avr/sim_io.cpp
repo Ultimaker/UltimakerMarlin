@@ -1,15 +1,17 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
-#include <SDL/SDL.h>
 
-#include "../../Marlin/configuration.h"
+#include "../component/base.h"
+#include "../frontend/frontend.h"
+#include "../clock.h"
+
+#include "../../Marlin/Configuration.h"
 #include "../../Marlin/pins.h"
 #include "../../Marlin/fastio.h"
 
 AVRRegistor __reg_map[__REG_MAP_SIZE];
-uint8_t __eeprom__storage[4096];
-sim_ms_callback_t ms_callback;
+uint8_t avr_simulation_eeprom_storage[4096];
 
 unsigned int __bss_end;
 unsigned int __heap_start;
@@ -20,47 +22,32 @@ extern void TIMER0_OVF_vect();
 extern void TIMER0_COMPB_vect();
 extern void TIMER1_COMPA_vect();
 
-unsigned int prevTicks = SDL_GetTicks();
-unsigned int twiIntStart = 0;
+static unsigned int prevTicks = 0;
 
-//After an interrupt we need to set the interrupt flag again, but do this without calling sim_check_interrupts so the interrupt does not fire recursively
+//After an interrupt we need to set the interrupt flag again, but do this without calling simUpdate so the interrupt does not fire recursively
 #define _sei() do { SREG.forceValue(SREG | _BV(SREG_I)); } while(0)
 
-void sim_check_interrupts()
+void simUpdate()
 {
     if (!(SREG & _BV(SREG_I)))
         return;
 
-    unsigned int ticks = SDL_GetTicks();
+    unsigned int ticks = getMilliseconds();
+    if (prevTicks == 0)
+        prevTicks = ticks;
     int tickDiff = ticks - prevTicks;
     prevTicks = ticks;
-
-#ifdef ENABLE_ULTILCD2
-    if ((TWCR & _BV(TWEN)) && (TWCR & _BV(TWINT)) && (TWCR & _BV(TWIE)))
-    {
-        //Relay the TWI interrupt by 25ms one time till it gets disabled again. This fakes the LCD refresh rate.
-        if (twiIntStart == 0)
-            twiIntStart = SDL_GetTicks();
-        if (SDL_GetTicks() - twiIntStart > 25)
-        {
-            cli();
-            TWI_vect();
-            _sei();
-        }
-    }
-    if (!(TWCR & _BV(TWEN)) || !(TWCR & _BV(TWIE)))
-    {
-        twiIntStart = 0;
-    }
-#endif
     
     //if (tickDiff > 1)
     //    printf("Ticks slow! %i\n", tickDiff);
     if (tickDiff > 0)
     {
-        ms_callback();
+        SimBaseComponent::tickAllComponents();
+        if (Frontend::instance)
+            Frontend::instance->update();
     
         cli();
+        //Timer0 is configured to trigger once per ms by Arduino.
         for(int n=0;n<tickDiff;n++)
         {
             if (TIMSK0 & _BV(OCIE0B))
@@ -101,28 +88,12 @@ void sim_check_interrupts()
     }
 }
 
-extern void sim_setup_main();
-
 //Assignment opperator called on every register write.
 AVRRegistor& AVRRegistor::operator = (const uint32_t v)
 {
     uint8_t n = v;
-    if (!ms_callback) sim_setup_main();
     callback(value, n);
     value = n;
-    sim_check_interrupts();
+    simUpdate();
     return *this;
-}
-
-void sim_setup(sim_ms_callback_t callback)
-{
-    FILE* f = fopen("eeprom.save", "rb");
-    if (f)
-    {
-        fread(__eeprom__storage, sizeof(__eeprom__storage), 1, f);
-        fclose(f);
-    }
-    ms_callback = callback;
-        
-    UCSR0A = 0;
 }

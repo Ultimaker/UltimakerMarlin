@@ -115,7 +115,6 @@ public:
         return is_initialized;
     }
 
-
 private:
     uint8_t sensor_nr;
     uint8_t sensor_address;

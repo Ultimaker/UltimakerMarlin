@@ -4,7 +4,8 @@
 #include "base.h"
 #include "arduinoIO.h"
 
-class stepperSim : public simBaseComponent
+class FluxAS5048B;
+class StepperSim : public SimBaseComponent
 {
 private:
     int minStepValue;
@@ -13,15 +14,18 @@ private:
     bool invertDir;
     int enablePin, stepPin, dirPin;
     int minEndstopPin, maxEndstopPin;
+    FluxAS5048B* flow_sensor;
+    float flow_sensor_ratio;
 public:
-    stepperSim(arduinoIOSim* arduinoIO, int enablePinNr, int stepPinNr, int dirPinNr, bool invertDir);
-    virtual ~stepperSim();
+    StepperSim(ArduinoIOSim* arduinoIO, int enablePinNr, int stepPinNr, int dirPinNr, bool invertDir);
+    virtual ~StepperSim();
     
     virtual void draw(int x, int y);
     
     void setRange(int minValue, int maxValue) { minStepValue = minValue; maxStepValue = maxValue; stepValue = (maxValue + minValue) / 2; }
     void setEndstops(int minEndstopPinNr, int maxEndstopPinNr);
     int getPosition() { return stepValue; }
+    void attachFlowSensor(FluxAS5048B* sensor, float ratio) { flow_sensor = sensor; flow_sensor_ratio = ratio;}
 private:
     void stepPinUpdate(int pinNr, bool high);
 };

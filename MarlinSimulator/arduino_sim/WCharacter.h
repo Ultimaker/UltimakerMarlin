@@ -21,6 +21,7 @@
 #define Character_h
 
 #include <ctype.h>
+#include <wctype.h>
 
 // WCharacter.h prototypes
 inline boolean isAlphaNumeric(int c) __attribute__((always_inline));
@@ -61,14 +62,14 @@ inline boolean isAlpha(int c)
 // that fits into the ASCII character set.
 inline boolean isAscii(int c)
 {
-  return ( isascii (c) == 0 ? false : true);
+  return (c & 0x7F) == 0x7F;
 }
 
 
 // Checks for a blank character, that is, a space or a tab.
 inline boolean isWhitespace(int c)
 {
-  return ( isblank (c) == 0 ? false : true);
+  return ( iswblank (c) == 0 ? false : true);
 }
 
 
@@ -143,7 +144,7 @@ inline boolean isHexadecimalDigit(int c)
 // ASCII character set, by clearing the high-order bits.
 inline int toAscii(int c)
 {
-  return toascii (c);
+  return (c) & 0x7F;
 }
 
 

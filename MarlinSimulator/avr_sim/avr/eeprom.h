@@ -35,63 +35,76 @@
 #ifndef _AVR_EEPROM_H_
 #define _AVR_EEPROM_H_ 1
 
+#include <assert.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
 
-extern uint8_t __eeprom__storage[4096];
+//Using __ name mangling here, to prevent possible name collisions with the actual AVR code.
+extern uint8_t avr_simulation_eeprom_storage[4096];
 
 static inline uint8_t eeprom_read_byte (const uint8_t *__p)
 {
-    return __eeprom__storage[int(__p)];
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint8_t));
+    return avr_simulation_eeprom_storage[long(__p)];
 }
 static inline uint16_t eeprom_read_word (const uint16_t *__p)
 {
-    return *(uint16_t*)&__eeprom__storage[int(__p)];
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint16_t));
+    return *(uint16_t*)&avr_simulation_eeprom_storage[long(__p)];
 }
 static inline uint32_t eeprom_read_dword (const uint32_t *__p)
 {
-    return *(uint32_t*)&__eeprom__storage[int(__p)];
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint32_t));
+    return *(uint32_t*)&avr_simulation_eeprom_storage[long(__p)];
 }
 #define eeprom_read_float eeprom_read_float_
 static inline float eeprom_read_float_ (const float *__p)
 {
-    return *(float*)&__eeprom__storage[int(__p)];
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(float));
+    return *(float*)&avr_simulation_eeprom_storage[long(__p)];
 }
 static inline void eeprom_read_block (void *__dst, const void *__src, size_t __n)
 {
-    memcpy(__dst, &__eeprom__storage[int(__src)], __n);
+    assert(long(__src) >= 0 && (unsigned long)(__src) <= sizeof(avr_simulation_eeprom_storage) - __n);
+    memcpy(__dst, &avr_simulation_eeprom_storage[long(__src)], __n);
 }
 
 static inline void eeprom_write_byte (uint8_t *__p, uint8_t __value)
 {
-    __eeprom__storage[int(__p)] = __value;
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint8_t));
+    avr_simulation_eeprom_storage[long(__p)] = __value;
 }
 static inline void eeprom_write_word (uint16_t *__p, uint16_t __value)
 {
-    *(uint16_t*)&__eeprom__storage[int(__p)] = __value;
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint16_t));
+    *(uint16_t*)&avr_simulation_eeprom_storage[long(__p)] = __value;
 }
 
 static inline void eeprom_write_dword (uint32_t *__p, uint32_t __value)
 {
-    *(uint32_t*)&__eeprom__storage[int(__p)] = __value;
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(uint32_t));
+    *(uint32_t*)&avr_simulation_eeprom_storage[long(__p)] = __value;
 }
 
 #define eeprom_write_float eeprom_write_float_
 static inline void eeprom_write_float_ (float *__p, float __value)
 {
-    *(float*)&__eeprom__storage[int(__p)] = __value;
+    assert(long(__p) >= 0 && (unsigned long)(__p) <= sizeof(avr_simulation_eeprom_storage) - sizeof(float));
+    *(float*)&avr_simulation_eeprom_storage[long(__p)] = __value;
 }
 
 static inline void eeprom_write_block (const void *__src, void *__dst, size_t __n)
 {
-    memcpy(&__eeprom__storage[int(__dst)], __src, __n);
+    assert(long(__src) >= 0 && (unsigned long)(__src) <= sizeof(avr_simulation_eeprom_storage) - __n);
+    memcpy(&avr_simulation_eeprom_storage[long(__dst)], __src, __n);
 }
 
-static inline void eeprom_update_byte (uint8_t *__p, uint8_t __value) {}
-static inline void eeprom_update_word (uint16_t *__p, uint16_t __value) {}
-static inline void eeprom_update_dword (uint32_t *__p, uint32_t __value) {}
-static inline void eeprom_update_float (float *__p, float __value) {}
-static inline void eeprom_update_block (const void *__src, void *__dst, size_t __n) {}
+//The update functions are a read&write if different. So we can just pass those on to the write functions.
+static inline void eeprom_update_byte (uint8_t *__p, uint8_t __value) { eeprom_write_byte(__p, __value); }
+static inline void eeprom_update_word (uint16_t *__p, uint16_t __value) { eeprom_write_word(__p, __value); }
+static inline void eeprom_update_dword (uint32_t *__p, uint32_t __value) { eeprom_write_dword(__p, __value); }
+static inline void eeprom_update_float (float *__p, float __value) { eeprom_write_float(__p, __value); }
+static inline void eeprom_update_block (const void *__src, void *__dst, size_t __n) { eeprom_write_block(__src, __dst, __n); }
 
 #endif	/* !_AVR_EEPROM_H_ */

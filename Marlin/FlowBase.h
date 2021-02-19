@@ -39,15 +39,10 @@ public:
 
     // @brief  Initialize all flow position variables.
     virtual void initFlowData() {};
- 
+
     // @brief   Configures the number of feeder steps required to move the filament 1mm.
     // @param   stepsPerMm is the number of steps to move the filament 1mm [float].
     virtual void setStepsPerMm(float stepsPerMm) {(void)stepsPerMm;};
-
-    // @brief Sets the minimal extrusion as a factor of the desired extrusion
-    // @param sensor_index The index of the sensor to set the factor for.
-    // @param factor Factor to use.
-    virtual void setMinimumExtrusionFactor(uint8_t /*sensor_index*/, float /*factor*/) {};
 
     // @brief   Set output rate (averaging) for all flow sensors.
     // @param   output_rate configures the refresh rate of the angle data, i.e. how many samples are averaged before output.

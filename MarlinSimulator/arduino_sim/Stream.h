@@ -25,7 +25,7 @@
 #include <inttypes.h>
 #include "Print.h"
 
-// compatibility macros for testing
+// compatability macros for testing
 /*
 #define   getInt()            parseInt()
 #define   getInt(skipChar)    parseInt(skipchar)

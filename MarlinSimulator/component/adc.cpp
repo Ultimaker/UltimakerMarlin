@@ -2,18 +2,22 @@
 
 #include "adc.h"
 
-adcSim::adcSim()
+AvrAdcSim::AvrAdcSim()
 {
-    ADCSRA.setCallback(DELEGATE(registerDelegate, adcSim, *this, ADC_ADCSRA_callback));
-    for(unsigned int n=0;n<16;n++)
-        adcValue[n] = 0;
+    ADCSRA.setCallback(DELEGATE(registerDelegate, AvrAdcSim, *this, ADC_ADCSRA_callback));
 }
 
-adcSim::~adcSim()
+AvrAdcSim::~AvrAdcSim()
 {
 }
 
-void adcSim::ADC_ADCSRA_callback(uint8_t oldValue, uint8_t& newValue)
+void AvrAdcSim::setReadCallback(int index, AdcDelegate function)
+{
+    if (index >= 0 && index < 16)
+        read_callbacks[index] = function;
+}
+
+void AvrAdcSim::ADC_ADCSRA_callback(uint8_t oldValue, uint8_t& newValue)
 {
     if ((newValue & _BV(ADEN)) && (newValue & _BV(ADSC)))
     {   //Start ADC conversion
@@ -21,6 +25,9 @@ void adcSim::ADC_ADCSRA_callback(uint8_t oldValue, uint8_t& newValue)
         if (ADCSRB & _BV(MUX5))
             idx += 8;
         
-        ADC = adcValue[idx];
+        int output = 0;
+        read_callbacks[idx](255, output);
+        ADC = output;
+        newValue &=~_BV(ADSC);
     }
 }

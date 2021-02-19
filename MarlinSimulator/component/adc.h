@@ -2,16 +2,21 @@
 #define ADC_SIM_H
 
 #include "base.h"
+#include "delegate.h"
 
-class adcSim : public simBaseComponent
+/* Callback to get an ADC value. First parameter is the maximum ADC range, 2nd parameter is the return value */
+typedef Delegate<int, int&> AdcDelegate;
+
+class AvrAdcSim : public SimBaseComponent
 {
 public:
-    adcSim();
-    virtual ~adcSim();
+    AvrAdcSim();
+    virtual ~AvrAdcSim();
     
-    int adcValue[16];
-    
+    void setReadCallback(int index, AdcDelegate function);
 private:
+    AdcDelegate read_callbacks[16];
+
     void ADC_ADCSRA_callback(uint8_t oldValue, uint8_t& newValue);
 };
 

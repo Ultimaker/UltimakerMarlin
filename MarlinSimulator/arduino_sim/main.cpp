@@ -1,20 +1,22 @@
 #include <Arduino.h>
 
-int main(void)
+extern bool setupSimulatorEnvironment(int argc, char** argv);
+
+int main(int argc, char** argv)
 {
-	init();
+    if (!setupSimulatorEnvironment(argc, argv))
+    {
+        return 1;
+    }
 
-#if defined(USBCON)
-	USBDevice.attach();
-#endif
-	
-	setup();
-    
-	for (;;) {
-		loop();
-		if (serialEventRun) serialEventRun();
-	}
-        
-	return 0;
+    init();
+
+    setup();
+
+    for (;;) {
+        loop();
+        if (serialEventRun) serialEventRun();
+    }
+
+    return 0;
 }
-
