@@ -15,8 +15,8 @@ A fork by bkubicek for the Ultimaker was merged, and further development was aid
 Some features have been added by:
 Lampmaker, Bradley Feldman, and others...
 
-Main difference between UM2:
-* Added bed capacitance distance sensor.
+Main changes for the UM2:
+* Added capacitive bed distance sensor
 * Improved dual nozzle support.
 * Added commands to read nozzle eeprom data.
 * Added filament movement sensor.
@@ -89,7 +89,7 @@ This leads to less blocking in the heater management routine.
 
 Serial Protocol Implementation:
 ===============================
-The serial protocol implementation can be found in the griffin repository, docs/Serial_Protocol.odt
+The serial protocol implementation can be found in the griffin repository, (docs/Serial_Protocol.pdf) [https://github.com/Ultimaker/UltimakerMarlin/blob/adding_credits/docs/Serial_Protocol.pdf]
 
 Implemented G Codes:
 ====================

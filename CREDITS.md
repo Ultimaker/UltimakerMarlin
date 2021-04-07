@@ -8,6 +8,7 @@ The following list provides an overview of contributors to the source.
 If you have contributed to the Ultimaker Marlin source code and want to be included, please contact support@ultimaker.com, state your claim and provide contact details. Ultimaker will verify your claim and add you to the list.
 
 ## Contributors
+* marcj71 (https://github.com/marcj71)
 * Robin den Hertog (https://github.com/robinmdh)
 * Ghostkeeper (https://github.com/Ghostkeeper)
 * Raymond Siudak (https://ultimaker.com/)

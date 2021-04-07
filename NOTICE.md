@@ -1,4 +1,4 @@
-# Dependencies
+# Third Party Libraries
 
 Ultimaker makes use of more Open Source libraries next to Marlin. The following lists all the externally developed libraries an Ultimaker printer uses.
 Please note that different types of printer may use a different subset of packages.
