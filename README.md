@@ -15,7 +15,7 @@ A fork by bkubicek for the Ultimaker was merged, and further development was aid
 Some features have been added by:
 Lampmaker, Bradley Feldman, and others...
 
-Main changes for the UM2:
+Main changes:
 * Added capacitive bed distance sensor
 * Improved dual nozzle support.
 * Added commands to read nozzle eeprom data.
